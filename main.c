@@ -7,22 +7,9 @@
 #include <assert.h>
 #include <errno.h>
 
-/*
- * Idea:
- *
- * char* name = cargs_arg(STRING, "out", "Output file path", NULL);
- * bool can_override = cargs_arg(BOOL, "override", "Overrides output file if it
- * exists", false);
- *
- * if (!cargs_parse(argc, argv)) {
- *  cargs_print_help();
- *  exit(1);
- * }
- */
-
 #define MAX_NAME_LEN        50  // null byte is not included
-#define MAX_DESCRIPTION_LEN 500 // null byte is not included
-#define MAX_STRING_ARG_LEN  500 // null byte is not included
+#define MAX_DESCRIPTION_LEN 100 // null byte is not included
+#define MAX_INPUT_VALUE_LEN 100 // null byte is not included
 
 #define MIN(a, b)           (((a) < (b)) ? (a) : (b))
 
@@ -147,7 +134,7 @@ bool argument_parse (int argc, char** argv)
 
 void print_help()
 {
-    char value[MAX_STRING_ARG_LEN] = { 0 };
+    char value[MAX_INPUT_VALUE_LEN] = { 0 };
 
     printf ("USAGE:\n");
     for (unsigned i = 0; i < arg_list_count; i++) {
@@ -194,9 +181,9 @@ void generic_alloc (struct TypeInterface* self, va_list default_value)
             *(int*)self->value = va_arg (default_value, int);
         }
     } else if (strcmp (self->name(), "string") == 0) {
-        self->value = malloc (sizeof (char) * MAX_STRING_ARG_LEN);
+        self->value = malloc (sizeof (char) * MAX_INPUT_VALUE_LEN);
         if (!parent->is_optional) {
-            strncpy (self->value, va_arg (default_value, char*), MAX_STRING_ARG_LEN);
+            strncpy (self->value, va_arg (default_value, char*), MAX_INPUT_VALUE_LEN);
         }
     } else {
         assert (false);
@@ -208,9 +195,9 @@ bool bool_parse_string (struct TypeInterface* self, const char* input)
     assert (self != NULL);
     assert (self->value != NULL);
 
-    if (strncmp ("true", input, MAX_STRING_ARG_LEN) == 0) {
+    if (strncmp ("true", input, MAX_INPUT_VALUE_LEN) == 0) {
         *(bool*)self->value = true;
-    } else if (strncmp ("false", input, MAX_STRING_ARG_LEN) == 0) {
+    } else if (strncmp ("false", input, MAX_INPUT_VALUE_LEN) == 0) {
         *(bool*)self->value = false;
     } else {
         fprintf (stderr, "Invalid boolean input\n");
@@ -240,7 +227,7 @@ bool string_parse_string (struct TypeInterface* self, const char* input)
     assert (self != NULL);
     assert (self->value != NULL);
 
-    strncpy (self->value, input, MAX_STRING_ARG_LEN);
+    strncpy (self->value, input, MAX_INPUT_VALUE_LEN);
     return true;
 }
 
