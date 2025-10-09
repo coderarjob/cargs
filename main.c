@@ -388,14 +388,78 @@ TypeInterface Double = {
 /*******************************************************************************************
  * Example
  *********************************************************************************************/
+typedef enum {
+    MODE_SINE_WAVE = 0,
+    MODE_AM_WAVE   = 1,
+    MODE_NOISE     = 2,
+    MODES_COUNT
+} Modes;
+
+void modes_alloc (struct TypeInterface* self, va_list default_value)
+{
+    assert (self != NULL);
+    Argument* this = PARENT_OF (self, Argument, interface);
+    assert (this != NULL);
+
+    if (!(self->value = malloc (sizeof (Modes)))) {
+        perror ("ERROR: Allocation failed");
+        panic (NULL);
+    }
+
+    if (this->is_optional) {
+        *(int*)self->value = va_arg (default_value, int);
+    }
+}
+
+bool modes_parse_string (struct TypeInterface* self, const char* input)
+{
+    assert (self != NULL);
+
+    Modes mode = 0;
+    if (strncmp ("sine", input, MAX_INPUT_VALUE_LEN) == 0) {
+        mode = MODE_SINE_WAVE;
+    } else if (strncmp ("am", input, MAX_INPUT_VALUE_LEN) == 0) {
+        mode = MODE_AM_WAVE;
+    } else if (strncmp ("noise", input, MAX_INPUT_VALUE_LEN) == 0) {
+        mode = MODE_NOISE;
+    } else {
+        ERROR (false, "Invalid mode: '%s'", input);
+    }
+
+    *(Modes*)self->value = mode;
+    return true;
+}
+
+void modes_to_string (struct TypeInterface* self, char* out, size_t size)
+{
+    assert (self != NULL);
+
+    char* mode_names[MODES_COUNT] = { "sine", "am", "noise" };
+
+    int mode = *(int*)self->value;
+    assert (mode > 0 && mode < MODES_COUNT);
+
+    strncpy (out, mode_names[mode], size);
+}
+
+TypeInterface ModesInterface = {
+    .name         = "Modes",
+    .alloc        = modes_alloc,
+    .free         = generic_free,
+    .parse_string = modes_parse_string,
+    .to_string    = modes_to_string,
+    .format_help  = "(sine|am|noise)",
+};
+
 int main (int argc, char** argv)
 {
     char* outfile  = argument_add ("out", "Output file path", String, true, "test.ppm");
     bool* override = argument_add ("override", "Overrides Output file if it exists", Boolean,
                                    false);
     int* gain      = argument_add ("gain", "Gain of the amplifier", Integer, true, 0);
-    bool* root     = argument_add ("root", "Run the application as root", Flag, true, false);
+    bool* root     = argument_add ("R", "Run the application as root", Flag, true, false);
     double* offset = argument_add ("offset", "Offset for the amplifer", Double, true, 13.6);
+    Modes* mode    = argument_add ("mode", "Mode of wave generation", ModesInterface, false);
 
     if (!argument_parse (argc, argv)) {
         print_help();
@@ -407,6 +471,7 @@ int main (int argc, char** argv)
     printf ("gain: %d\n", *gain);
     printf ("root: %d\n", *root);
     printf ("offset: %f\n", *offset);
+    printf ("mode: %d\n", *mode);
 
     for (unsigned i = 0; i < arg_list_count; i++) {
         Argument* this = arg_list[i];
