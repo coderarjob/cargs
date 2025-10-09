@@ -190,17 +190,17 @@ void generic_alloc (struct TypeInterface* self, va_list default_value)
 
     if (strcmp (self->name, "boolean") == 0) {
         self->value = malloc (sizeof (bool));
-        if (!parent->is_optional) {
+        if (parent->is_optional) {
             *(bool*)self->value = va_arg (default_value, int);
         }
     } else if (strcmp (self->name, "integer") == 0) {
         self->value = malloc (sizeof (int));
-        if (!parent->is_optional) {
+        if (parent->is_optional) {
             *(int*)self->value = va_arg (default_value, int);
         }
     } else if (strcmp (self->name, "string") == 0) {
         self->value = malloc (sizeof (char) * MAX_INPUT_VALUE_LEN);
-        if (!parent->is_optional) {
+        if (parent->is_optional) {
             strncpy (self->value, va_arg (default_value, char*), MAX_INPUT_VALUE_LEN);
         }
     } else if (strcmp (self->name, "flag") == 0) {
