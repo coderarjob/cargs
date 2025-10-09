@@ -28,6 +28,21 @@ typedef struct {
     bool provided; // true if some value was provided. Always true for optional arguments.
     TypeInterface* interface;
 } Argument;
+
+void panic (const char* msg)
+{
+    if (msg != NULL) {
+        fprintf (stderr, "PANIC! %s\n", msg);
+    }
+    exit (1);
+}
+
+#define ERROR(ret, msg, ...)                                 \
+    do {                                                     \
+        fprintf (stderr, "ERROR: " msg "\n", ##__VA_ARGS__); \
+        return ret;                                          \
+    } while (0)
+
 /*******************************************************************************************
  * Argument functions
  *********************************************************************************************/
@@ -40,12 +55,12 @@ void* argument_add (const char* name, const char* description, TypeInterface* in
     Argument* new = NULL;
 
     if (arg_list_count >= 10) {
-        return NULL;
+        panic ("Too many arguments added");
     }
 
     if (!(new = malloc (sizeof (Argument)))) {
         perror ("ERROR: Allocation failed");
-        return NULL;
+        panic (NULL);
     }
 
     char temp_name[MAX_NAME_LEN + 1] = { '-', 0 }; // +1 for '\0' char
@@ -53,12 +68,12 @@ void* argument_add (const char* name, const char* description, TypeInterface* in
 
     if (!(new->name = strndup (temp_name, MAX_NAME_LEN))) {
         perror ("ERROR: Allocation failed");
-        return NULL;
+        panic (NULL);
     }
 
     if (!(new->description = strndup (description, MAX_DESCRIPTION_LEN))) {
         perror ("ERROR: Allocation failed");
-        return NULL;
+        panic (NULL);
     }
 
     new->is_optional = is_optional;
@@ -104,8 +119,7 @@ bool argument_parse (int argc, char** argv)
     for (char* arg = NULL; (arg = *argv) != NULL; argv++) {
         if (state_is_key) {
             if (!(this = find_by_name (arg))) {
-                fprintf (stderr, "ERROR: Argument '%s' is unknown\n", arg);
-                return false;
+                ERROR (false, "Argument '%s' is unknown", arg);
             }
             state_is_key = false; // Now parse value for this key
         } else {
@@ -123,8 +137,7 @@ bool argument_parse (int argc, char** argv)
     for (unsigned i = 0; i < arg_list_count; i++) {
         Argument* this = arg_list[i];
         if (!this->provided) {
-            fprintf (stderr, "Argument '%s' is required but was not provided\n", this->name);
-            return false;
+            ERROR (false, "Argument '%s' is required but was not provided", this->name);
         }
     }
     return true;
@@ -197,8 +210,7 @@ bool bool_parse_string (struct TypeInterface* self, const char* input)
     } else if (strncmp ("false", input, MAX_INPUT_VALUE_LEN) == 0) {
         *(bool*)self->value = false;
     } else {
-        fprintf (stderr, "Invalid boolean input\n");
-        return false;
+        ERROR (false, "Invalid boolean input");
     }
 
     return true;
@@ -212,8 +224,7 @@ bool int_parse_string (struct TypeInterface* self, const char* input)
     errno              = 0; // To detect if strtol failed
     *(int*)self->value = strtol (input, NULL, 10);
     if (errno == ERANGE) {
-        fprintf (stderr, "Invalid integer input\n");
-        return false;
+        ERROR (false, "Invalid integer input");
     }
 
     return true;
