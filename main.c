@@ -2,7 +2,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -16,6 +15,7 @@ typedef struct TypeInterface {
     void* value;
     char* name;
     char* format_help;
+    size_t type_size;
     void (*alloc) (struct TypeInterface* self, const char* default_value);
     void (*free) (struct TypeInterface* self);
     bool (*parse_string) (struct TypeInterface* self, const char* input);
@@ -184,27 +184,9 @@ void generic_free (struct TypeInterface* self)
     }
 }
 
-void generic_alloc (struct TypeInterface* self, const char* default_value)
+void default_alloc (struct TypeInterface* self, const char* default_value)
 {
-    assert (self != NULL);
-
-    size_t sizeof_type = 0;
-
-    if (strcmp (self->name, "boolean") == 0) {
-        sizeof_type = sizeof (bool);
-    } else if (strcmp (self->name, "integer") == 0) {
-        sizeof_type = sizeof (int);
-    } else if (strcmp (self->name, "string") == 0) {
-        sizeof_type = sizeof (char) * MAX_INPUT_VALUE_LEN;
-    } else if (strcmp (self->name, "flag") == 0) {
-        sizeof_type = sizeof (bool);
-    } else if (strcmp (self->name, "double") == 0) {
-        sizeof_type = sizeof (double);
-    } else {
-        assert (false);
-    }
-
-    if (!(self->value = malloc (sizeof_type))) {
+    if (!(self->value = malloc (self->type_size))) {
         perror ("ERROR: Allocation failed");
         panic (NULL);
     }
@@ -284,7 +266,8 @@ bool double_parse_string (struct TypeInterface* self, const char* input)
 
 TypeInterface Boolean = {
     .name         = "boolean",
-    .alloc        = generic_alloc,
+    .type_size    = sizeof (int),
+    .alloc        = default_alloc,
     .free         = generic_free,
     .parse_string = bool_parse_string,
     .format_help  = "(false|true)",
@@ -292,7 +275,8 @@ TypeInterface Boolean = {
 
 TypeInterface Integer = {
     .name         = "integer",
-    .alloc        = generic_alloc,
+    .type_size    = sizeof (int),
+    .alloc        = default_alloc,
     .free         = generic_free,
     .parse_string = int_parse_string,
     .format_help  = "(number)",
@@ -300,7 +284,8 @@ TypeInterface Integer = {
 
 TypeInterface String = {
     .name         = "string",
-    .alloc        = generic_alloc,
+    .type_size    = sizeof (char) * MAX_INPUT_VALUE_LEN,
+    .alloc        = default_alloc,
     .free         = generic_free,
     .parse_string = string_parse_string,
     .format_help  = "(text)",
@@ -308,7 +293,8 @@ TypeInterface String = {
 
 TypeInterface Flag = {
     .name         = "flag",
-    .alloc        = generic_alloc,
+    .type_size    = sizeof (int),
+    .alloc        = default_alloc,
     .free         = generic_free,
     .parse_string = flag_parse_string,
     .format_help  = "",
@@ -316,7 +302,8 @@ TypeInterface Flag = {
 
 TypeInterface Double = {
     .name         = "double",
-    .alloc        = generic_alloc,
+    .type_size    = sizeof (double),
+    .alloc        = default_alloc,
     .free         = generic_free,
     .parse_string = double_parse_string,
     .format_help  = "(decimal number)",
@@ -331,20 +318,6 @@ typedef enum {
     MODE_NOISE     = 2,
     MODES_COUNT
 } Modes;
-
-void modes_alloc (struct TypeInterface* self, const char* default_value)
-{
-    assert (self != NULL);
-
-    if (!(self->value = malloc (sizeof (Modes)))) {
-        perror ("ERROR: Allocation failed");
-        panic (NULL);
-    }
-
-    if (default_value != NULL) {
-        self->parse_string (self, default_value);
-    }
-}
 
 bool modes_parse_string (struct TypeInterface* self, const char* input)
 {
@@ -367,7 +340,8 @@ bool modes_parse_string (struct TypeInterface* self, const char* input)
 
 TypeInterface ModesInterface = {
     .name         = "Modes",
-    .alloc        = modes_alloc,
+    .alloc        = default_alloc,
+    .type_size    = sizeof (Modes),
     .free         = generic_free,
     .parse_string = modes_parse_string,
     .format_help  = "(sine|am|noise)",
