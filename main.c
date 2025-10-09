@@ -303,25 +303,7 @@ void int_to_string (struct TypeInterface* self, char* out, size_t size)
     assert (size > 0);
 
     int value = *(int*)self->value;
-
-    if (value < 0 && size > 1) {
-        *out++ = '-';
-        size--;
-        value *= -1;
-    }
-
-    char* start = out;
-    for (unsigned i = 0; (i == 0 || value > 0) && size > 1 && i < size;
-         i++, value /= 10, out++, size--) {
-        *out = '0' + (value % 10);
-    }
-    *out = '\0';
-
-    for (out--; start < out; out--, start++) {
-        char t = *start;
-        *start = *out;
-        *out   = t;
-    }
+    snprintf (out, size, "%d", value);
 }
 
 void string_to_string (struct TypeInterface* self, char* out, size_t size)
