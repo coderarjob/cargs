@@ -407,5 +407,10 @@ int main (int argc, char** argv)
     printf ("gain: %d\n", *gain);
     printf ("root: %d\n", *root);
     printf ("offset: %f\n", *offset);
+
+    for (unsigned i = 0; i < arg_list_count; i++) {
+        Argument* this = arg_list[i];
+        argument_free (this);
+    }
     return 0;
 }
