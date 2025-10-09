@@ -16,16 +16,15 @@ typedef struct TypeInterface {
     void* value;
     char* name;
     char* format_help;
-    void (*alloc) (struct TypeInterface* self, va_list* default_value);
+    void (*alloc) (struct TypeInterface* self, const char* default_value);
     void (*free) (struct TypeInterface* self);
     bool (*parse_string) (struct TypeInterface* self, const char* input);
-    void (*to_string) (struct TypeInterface* self, char* out, size_t size);
 } TypeInterface;
 
 typedef struct {
     char* name;
     char* description;
-    bool is_optional;
+    char* default_value;
     bool provided; // true if some value was provided. Always true for optional arguments.
     TypeInterface interface;
 } Argument;
@@ -51,7 +50,7 @@ unsigned int arg_list_count = 0;
 Argument* arg_list[10];
 
 void* argument_add (const char* name, const char* description, TypeInterface interface,
-                    bool is_optional, ...)
+                    const char* default_value)
 {
     Argument* new = NULL;
 
@@ -77,15 +76,18 @@ void* argument_add (const char* name, const char* description, TypeInterface int
         panic (NULL);
     }
 
-    new->is_optional = is_optional;
-    new->provided    = is_optional;
-    new->interface   = interface;
+    if (default_value != NULL) {
+        if (!(new->default_value = strndup (default_value, MAX_DESCRIPTION_LEN))) {
+            perror ("ERROR: Allocation failed");
+            panic (NULL);
+        }
+    } else {
+        new->default_value = NULL;
+    }
 
-    va_list l;
-    va_start (l, is_optional);
-    va_list* default_value = (is_optional) ? &l : NULL; // Optional args have default value
+    new->provided  = default_value != NULL;
+    new->interface = interface;
     new->interface.alloc (&new->interface, default_value);
-    va_end (l);
 
     arg_list[arg_list_count++] = new;
 
@@ -133,8 +135,8 @@ bool argument_parse (int argc, char** argv)
             }
         } else {
             assert (this != NULL);
-            assert ((this->is_optional && this->provided) ||
-                    (!this->is_optional && !this->provided));
+            assert ((this->default_value && this->provided) ||
+                    (!this->default_value && !this->provided));
 
             this->provided = this->interface.parse_string (&this->interface, arg);
             state_is_key   = true; // Now parse new key
@@ -159,11 +161,8 @@ void print_help()
         Argument* this = arg_list[i];
 
         printf ("  %-10s\t%-20s %s ", this->name, this->interface.format_help, this->description);
-        if (this->is_optional) {
-            char value[MAX_INPUT_VALUE_LEN] = { 0 };
-            this->interface.to_string (&this->interface, value, sizeof (value));
-
-            printf ("(Default set to '%s')\n", value);
+        if (this->default_value) {
+            printf ("(Default set to '%s')\n", this->default_value);
         } else {
             printf ("(Required)\n");
         }
@@ -182,7 +181,7 @@ void generic_free (struct TypeInterface* self)
     }
 }
 
-void generic_alloc (struct TypeInterface* self, va_list* default_value)
+void generic_alloc (struct TypeInterface* self, const char* default_value)
 {
     assert (self != NULL);
 
@@ -208,33 +207,7 @@ void generic_alloc (struct TypeInterface* self, va_list* default_value)
     }
 
     if (default_value != NULL) {
-        void* value = NULL;
-        int int_value;
-        double double_value;
-
-        if (strcmp (self->name, "boolean") == 0) {
-            int_value = va_arg (*default_value, int);
-            value     = &int_value;
-        } else if (strcmp (self->name, "integer") == 0) {
-            int_value = va_arg (*default_value, int);
-            value     = &int_value;
-        } else if (strcmp (self->name, "string") == 0) {
-            value = va_arg (*default_value, char*);
-        } else if (strcmp (self->name, "flag") == 0) {
-            int_value = va_arg (*default_value, int);
-            value     = &int_value;
-        } else if (strcmp (self->name, "double") == 0) {
-            double_value = va_arg (*default_value, double);
-            value        = &double_value;
-        } else {
-            assert (false);
-        }
-
-        if (strcmp (self->name, "string") == 0) {
-            strncpy (self->value, value, sizeof_type);
-        } else {
-            memcpy (self->value, value, sizeof_type);
-        }
+        self->parse_string (self, default_value);
     }
 }
 
@@ -302,49 +275,6 @@ bool double_parse_string (struct TypeInterface* self, const char* input)
     return true;
 }
 
-void bool_to_string (struct TypeInterface* self, char* out, size_t size)
-{
-    assert (self != NULL);
-    assert (self->value != NULL);
-    assert (out != NULL);
-    assert (size > 0);
-
-    bool value = *(bool*)self->value;
-    strncpy (out, (value) ? "true" : "false", size);
-}
-
-void int_to_string (struct TypeInterface* self, char* out, size_t size)
-{
-    assert (self != NULL);
-    assert (self->value != NULL);
-    assert (out != NULL);
-    assert (size > 0);
-
-    int value = *(int*)self->value;
-    snprintf (out, size, "%d", value);
-}
-
-void string_to_string (struct TypeInterface* self, char* out, size_t size)
-{
-    assert (self != NULL);
-    assert (self->value != NULL);
-    assert (out != NULL);
-    assert (size > 0);
-
-    strncpy (out, self->value, size);
-}
-
-void double_to_string (struct TypeInterface* self, char* out, size_t size)
-{
-    assert (self != NULL);
-    assert (self->value != NULL);
-    assert (out != NULL);
-    assert (size > 0);
-
-    double value = *(double*)self->value;
-    snprintf (out, size, "%f", value);
-}
-
 /*******************************************************************************************
  * Interface types
  *********************************************************************************************/
@@ -354,7 +284,6 @@ TypeInterface Boolean = {
     .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = bool_parse_string,
-    .to_string    = bool_to_string,
     .format_help  = "(false|true)",
 };
 
@@ -363,7 +292,6 @@ TypeInterface Integer = {
     .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = int_parse_string,
-    .to_string    = int_to_string,
     .format_help  = "(number)",
 };
 
@@ -372,7 +300,6 @@ TypeInterface String = {
     .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = string_parse_string,
-    .to_string    = string_to_string,
     .format_help  = "(text)",
 };
 
@@ -381,7 +308,6 @@ TypeInterface Flag = {
     .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = flag_parse_string,
-    .to_string    = bool_to_string,
     .format_help  = "",
 };
 
@@ -390,7 +316,6 @@ TypeInterface Double = {
     .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = double_parse_string,
-    .to_string    = double_to_string,
     .format_help  = "(decimal number)",
 };
 
@@ -404,7 +329,7 @@ typedef enum {
     MODES_COUNT
 } Modes;
 
-void modes_alloc (struct TypeInterface* self, va_list* default_value)
+void modes_alloc (struct TypeInterface* self, const char* default_value)
 {
     assert (self != NULL);
 
@@ -414,7 +339,7 @@ void modes_alloc (struct TypeInterface* self, va_list* default_value)
     }
 
     if (default_value != NULL) {
-        *(int*)self->value = va_arg (*default_value, int);
+        self->parse_string (self, default_value);
     }
 }
 
@@ -437,36 +362,22 @@ bool modes_parse_string (struct TypeInterface* self, const char* input)
     return true;
 }
 
-void modes_to_string (struct TypeInterface* self, char* out, size_t size)
-{
-    assert (self != NULL);
-
-    char* mode_names[MODES_COUNT] = { "sine", "am", "noise" };
-
-    int mode = *(int*)self->value;
-    assert (mode > 0 && mode < MODES_COUNT);
-
-    strncpy (out, mode_names[mode], size);
-}
-
 TypeInterface ModesInterface = {
     .name         = "Modes",
     .alloc        = modes_alloc,
     .free         = generic_free,
     .parse_string = modes_parse_string,
-    .to_string    = modes_to_string,
     .format_help  = "(sine|am|noise)",
 };
 
 int main (int argc, char** argv)
 {
-    char* outfile  = argument_add ("out", "Output file path", String, true, "test.ppm");
-    bool* override = argument_add ("override", "Overrides Output file if it exists", Boolean,
-                                   false);
-    int* gain      = argument_add ("gain", "Gain of the amplifier", Integer, true, 0);
-    bool* root     = argument_add ("R", "Run the application as root", Flag, true, false);
-    double* offset = argument_add ("offset", "Offset for the amplifer", Double, true, 13.6);
-    Modes* mode    = argument_add ("mode", "Mode of wave generation", ModesInterface, false);
+    char* outfile  = argument_add ("out", "Output file path", String, "test.ppm");
+    bool* override = argument_add ("override", "Overrides Output file if it exists", Boolean, NULL);
+    int* gain      = argument_add ("gain", "Gain of the amplifier", Integer, "0");
+    bool* root     = argument_add ("R", "Run the application as root", Flag, "false");
+    double* offset = argument_add ("offset", "Offset for the amplifer", Double, "13.6");
+    Modes* mode    = argument_add ("mode", "Mode of wave generation", ModesInterface, NULL);
 
     if (!argument_parse (argc, argv)) {
         print_help();
