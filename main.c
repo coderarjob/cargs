@@ -99,6 +99,9 @@ void argument_free (Argument* arg)
     arg->interface.free (&arg->interface);
     free (arg->name);
     free (arg->description);
+    if (arg->default_value) {
+        free (arg->default_value);
+    }
     free (arg);
 }
 
