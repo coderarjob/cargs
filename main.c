@@ -32,7 +32,7 @@ typedef struct TypeInterface {
     void (*free) (struct TypeInterface* self);
     bool (*parse_string) (struct TypeInterface* self, const char* input);
     void (*to_string) (struct TypeInterface* self, char* out, size_t size);
-    void (*format_help) (char* out, size_t size);
+    char* (*format_help)();
 } TypeInterface;
 
 typedef struct {
@@ -146,16 +146,15 @@ bool argument_parse (int argc, char** argv)
 
 void print_help()
 {
-    char format_help[20]           = { 0 };
     char value[MAX_STRING_ARG_LEN] = { 0 };
 
     printf ("USAGE:\n");
     for (unsigned i = 0; i < arg_list_count; i++) {
         Argument* this = arg_list[i];
-        this->interface->format_help (format_help, sizeof (format_help));
         this->interface->to_string (this->interface, value, sizeof (value));
 
-        printf ("  %-10s\t%s %s ", this->name, format_help, this->description);
+        printf ("  %-10s\t%-20s %s ", this->name, this->interface->format_help(),
+                this->description);
         if (this->is_optional) {
             printf ("(Default set to '%s')\n", value);
         } else {
@@ -309,19 +308,19 @@ void string_to_string (struct TypeInterface* self, char* out, size_t size)
     strncpy (out, self->value, size);
 }
 
-void bool_format_help (char* out, size_t size)
+char* bool_format_help()
 {
-    strncpy (out, "(false|true)", size);
+    return "(false|true)";
 }
 
-void int_format_help (char* out, size_t size)
+char* int_format_help()
 {
-    strncpy (out, "(number)", size);
+    return "(number)";
 }
 
-void string_format_help (char* out, size_t size)
+char* string_format_help()
 {
-    strncpy (out, "(text)", size);
+    return "(text)";
 }
 
 /*******************************************************************************************
