@@ -210,6 +210,11 @@ void generic_alloc (struct TypeInterface* self, va_list default_value)
                    "Use Boolean for non optional boolean arguments");
         }
         *(bool*)self->value = va_arg (default_value, int);
+    } else if (strcmp (self->name, "double") == 0) {
+        self->value = malloc (sizeof (double));
+        if (parent->is_optional) {
+            *(double*)self->value = va_arg (default_value, double);
+        }
     } else {
         assert (false);
     }
@@ -265,6 +270,20 @@ bool flag_parse_string (struct TypeInterface* self, const char* input)
     return true;
 }
 
+bool double_parse_string (struct TypeInterface* self, const char* input)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+
+    errno                 = 0; // To detect if strtol failed
+    *(double*)self->value = strtod (input, NULL);
+    if (errno == ERANGE) {
+        ERROR (false, "Invalid floating point input");
+    }
+
+    return true;
+}
+
 void bool_to_string (struct TypeInterface* self, char* out, size_t size)
 {
     assert (self != NULL);
@@ -315,6 +334,17 @@ void string_to_string (struct TypeInterface* self, char* out, size_t size)
     strncpy (out, self->value, size);
 }
 
+void double_to_string (struct TypeInterface* self, char* out, size_t size)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+    assert (out != NULL);
+    assert (size > 0);
+
+    double value = *(double*)self->value;
+    snprintf (out, size, "%f", value);
+}
+
 /*******************************************************************************************
  * Interface types
  *********************************************************************************************/
@@ -355,6 +385,15 @@ TypeInterface Flag = {
     .format_help  = "",
 };
 
+TypeInterface Double = {
+    .name         = "double",
+    .alloc        = generic_alloc,
+    .free         = generic_free,
+    .parse_string = double_parse_string,
+    .to_string    = double_to_string,
+    .format_help  = "(decimal number)",
+};
+
 /*******************************************************************************************
  * Example
  *********************************************************************************************/
@@ -364,7 +403,8 @@ int main (int argc, char** argv)
     bool* override = argument_add ("override", "Overrides Output file if it exists", Boolean,
                                    false);
     int* gain      = argument_add ("gain", "Gain of the amplifier", Integer, true, 0);
-    int* root      = argument_add ("root", "Run the application as root", Flag, true, false);
+    bool* root     = argument_add ("root", "Run the application as root", Flag, true, false);
+    double* offset = argument_add ("offset", "Offset for the amplifer", Double, true, 13.6);
 
     if (!argument_parse (argc, argv)) {
         print_help();
@@ -375,5 +415,6 @@ int main (int argc, char** argv)
     printf ("override: %d\n", *override);
     printf ("gain: %d\n", *gain);
     printf ("root: %d\n", *root);
+    printf ("offset: %f\n", *offset);
     return 0;
 }
