@@ -222,7 +222,11 @@ void generic_alloc (struct TypeInterface* self, va_list default_value)
         panic (NULL);
     }
 
-    memcpy (self->value, value, sizeof_type);
+    if (strcmp (self->name, "string") == 0) {
+        strncpy (self->value, value, sizeof_type);
+    } else {
+        memcpy (self->value, value, sizeof_type);
+    }
 }
 
 bool bool_parse_string (struct TypeInterface* self, const char* input)
