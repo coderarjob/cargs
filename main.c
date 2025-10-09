@@ -153,15 +153,15 @@ bool argument_parse (int argc, char** argv)
 
 void print_help()
 {
-    char value[MAX_INPUT_VALUE_LEN] = { 0 };
-
     printf ("USAGE:\n");
     for (unsigned i = 0; i < arg_list_count; i++) {
         Argument* this = arg_list[i];
-        this->interface.to_string (&this->interface, value, sizeof (value));
 
         printf ("  %-10s\t%-20s %s ", this->name, this->interface.format_help, this->description);
         if (this->is_optional) {
+            char value[MAX_INPUT_VALUE_LEN] = { 0 };
+            this->interface.to_string (&this->interface, value, sizeof (value));
+
             printf ("(Default set to '%s')\n", value);
         } else {
             printf ("(Required)\n");
