@@ -188,36 +188,41 @@ void generic_alloc (struct TypeInterface* self, va_list default_value)
     Argument* parent = PARENT_OF (self, Argument, interface);
     assert (parent != NULL);
 
+    size_t sizeof_type = 0;
+    void* value        = NULL;
+
+    int int_value;
+    double double_value;
+
     if (strcmp (self->name, "boolean") == 0) {
-        self->value = malloc (sizeof (bool));
-        if (parent->is_optional) {
-            *(bool*)self->value = va_arg (default_value, int);
-        }
+        sizeof_type = sizeof (bool);
+        int_value   = va_arg (default_value, int);
+        value       = &int_value;
     } else if (strcmp (self->name, "integer") == 0) {
-        self->value = malloc (sizeof (int));
-        if (parent->is_optional) {
-            *(int*)self->value = va_arg (default_value, int);
-        }
+        sizeof_type = sizeof (int);
+        int_value   = va_arg (default_value, int);
+        value       = &int_value;
     } else if (strcmp (self->name, "string") == 0) {
-        self->value = malloc (sizeof (char) * MAX_INPUT_VALUE_LEN);
-        if (parent->is_optional) {
-            strncpy (self->value, va_arg (default_value, char*), MAX_INPUT_VALUE_LEN);
-        }
+        sizeof_type = sizeof (char) * MAX_INPUT_VALUE_LEN;
+        value       = va_arg (default_value, char*);
     } else if (strcmp (self->name, "flag") == 0) {
-        self->value = malloc (sizeof (bool));
-        if (!parent->is_optional) {
-            panic ("Flag arguments must be optional. "
-                   "Use Boolean for non optional boolean arguments");
-        }
-        *(bool*)self->value = va_arg (default_value, int);
+        sizeof_type = sizeof (bool);
+        int_value   = va_arg (default_value, int);
+        value       = &int_value;
     } else if (strcmp (self->name, "double") == 0) {
-        self->value = malloc (sizeof (double));
-        if (parent->is_optional) {
-            *(double*)self->value = va_arg (default_value, double);
-        }
+        sizeof_type  = sizeof (double);
+        double_value = va_arg (default_value, double);
+        value        = &double_value;
     } else {
         assert (false);
     }
+
+    if (!(self->value = malloc (sizeof_type))) {
+        perror ("ERROR: Allocation failed");
+        panic (NULL);
+    }
+
+    memcpy (self->value, value, sizeof_type);
 }
 
 bool bool_parse_string (struct TypeInterface* self, const char* input)
