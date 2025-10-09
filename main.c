@@ -28,6 +28,7 @@
 
 typedef struct TypeInterface {
     void* value;
+    char* (*name)();
     void (*alloc) (struct TypeInterface* self, va_list default_value);
     void (*free) (struct TypeInterface* self);
     bool (*parse_string) (struct TypeInterface* self, const char* input);
@@ -175,45 +176,30 @@ void generic_free (struct TypeInterface* self)
     }
 }
 
-void bool_alloc (struct TypeInterface* self, va_list default_value)
+void generic_alloc (struct TypeInterface* self, va_list default_value)
 {
     assert (self != NULL);
-
-    self->value = malloc (sizeof (bool));
 
     Argument* parent = PARENT_OF (self, Argument, interface);
     assert (parent != NULL);
 
-    if (!parent->is_optional) {
-        *(bool*)self->value = va_arg (default_value, int);
-    }
-}
-
-void int_alloc (struct TypeInterface* self, va_list default_value)
-{
-    assert (self != NULL);
-
-    self->value = malloc (sizeof (int));
-
-    Argument* parent = PARENT_OF (self, Argument, interface);
-    assert (parent != NULL);
-
-    if (!parent->is_optional) {
-        *(int*)self->value = va_arg (default_value, int);
-    }
-}
-
-void string_alloc (struct TypeInterface* self, va_list default_value)
-{
-    assert (self != NULL);
-
-    self->value = malloc (sizeof (char) * MAX_STRING_ARG_LEN);
-
-    Argument* parent = PARENT_OF (self, Argument, interface);
-    assert (parent != NULL);
-
-    if (!parent->is_optional) {
-        strncpy (self->value, va_arg (default_value, char*), MAX_STRING_ARG_LEN);
+    if (strcmp (self->name(), "boolean") == 0) {
+        self->value = malloc (sizeof (bool));
+        if (!parent->is_optional) {
+            *(bool*)self->value = va_arg (default_value, int);
+        }
+    } else if (strcmp (self->name(), "integer") == 0) {
+        self->value = malloc (sizeof (int));
+        if (!parent->is_optional) {
+            *(int*)self->value = va_arg (default_value, int);
+        }
+    } else if (strcmp (self->name(), "string") == 0) {
+        self->value = malloc (sizeof (char) * MAX_STRING_ARG_LEN);
+        if (!parent->is_optional) {
+            strncpy (self->value, va_arg (default_value, char*), MAX_STRING_ARG_LEN);
+        }
+    } else {
+        assert (false);
     }
 }
 
@@ -323,12 +309,28 @@ char* string_format_help()
     return "(text)";
 }
 
+char* bool_name()
+{
+    return "boolean";
+}
+
+char* int_name()
+{
+    return "integer";
+}
+
+char* string_name()
+{
+    return "string";
+}
+
 /*******************************************************************************************
  * Interface types
  *********************************************************************************************/
 
 TypeInterface Boolean = {
-    .alloc        = bool_alloc,
+    .name         = bool_name,
+    .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = bool_parse_string,
     .to_string    = bool_to_string,
@@ -336,7 +338,8 @@ TypeInterface Boolean = {
 };
 
 TypeInterface Integer = {
-    .alloc        = int_alloc,
+    .name         = int_name,
+    .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = int_parse_string,
     .to_string    = int_to_string,
@@ -344,7 +347,8 @@ TypeInterface Integer = {
 };
 
 TypeInterface String = {
-    .alloc        = string_alloc,
+    .name         = string_name,
+    .alloc        = generic_alloc,
     .free         = generic_free,
     .parse_string = string_parse_string,
     .to_string    = string_to_string,
