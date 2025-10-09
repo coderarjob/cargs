@@ -123,6 +123,13 @@ bool argument_parse (int argc, char** argv)
                 ERROR (false, "Argument '%s' is unknown", arg);
             }
             state_is_key = false; // Now parse value for this key
+
+            // Special case for flags. They are the only ones with just key and no value, so it made
+            // little sense to add a 'is_flag' field in the TypeInterface struct.
+            if (strcmp ("flag", this->interface.name) == 0) {
+                this->provided = this->interface.parse_string (&this->interface, arg);
+                state_is_key   = true; // Now parse value for this key
+            }
         } else {
             assert (this != NULL);
             assert ((this->is_optional && this->provided) ||
@@ -196,6 +203,13 @@ void generic_alloc (struct TypeInterface* self, va_list default_value)
         if (!parent->is_optional) {
             strncpy (self->value, va_arg (default_value, char*), MAX_INPUT_VALUE_LEN);
         }
+    } else if (strcmp (self->name, "flag") == 0) {
+        self->value = malloc (sizeof (bool));
+        if (!parent->is_optional) {
+            panic ("Flag arguments must be optional. "
+                   "Use Boolean for non optional boolean arguments");
+        }
+        *(bool*)self->value = va_arg (default_value, int);
     } else {
         assert (false);
     }
@@ -237,6 +251,17 @@ bool string_parse_string (struct TypeInterface* self, const char* input)
     assert (self->value != NULL);
 
     strncpy (self->value, input, MAX_INPUT_VALUE_LEN);
+    return true;
+}
+
+bool flag_parse_string (struct TypeInterface* self, const char* input)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+
+    (void)input;
+
+    *(bool*)self->value = true;
     return true;
 }
 
@@ -321,6 +346,15 @@ TypeInterface String = {
     .format_help  = "(text)",
 };
 
+TypeInterface Flag = {
+    .name         = "flag",
+    .alloc        = generic_alloc,
+    .free         = generic_free,
+    .parse_string = flag_parse_string,
+    .to_string    = bool_to_string,
+    .format_help  = "",
+};
+
 /*******************************************************************************************
  * Example
  *********************************************************************************************/
@@ -330,6 +364,7 @@ int main (int argc, char** argv)
     bool* override = argument_add ("override", "Overrides Output file if it exists", Boolean,
                                    false);
     int* gain      = argument_add ("gain", "Gain of the amplifier", Integer, true, 0);
+    int* root      = argument_add ("root", "Run the application as root", Flag, true, false);
 
     if (!argument_parse (argc, argv)) {
         print_help();
@@ -339,5 +374,6 @@ int main (int argc, char** argv)
     printf ("outfile: %s\n", outfile);
     printf ("override: %d\n", *override);
     printf ("gain: %d\n", *gain);
+    printf ("root: %d\n", *root);
     return 0;
 }
