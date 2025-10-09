@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -26,7 +27,7 @@ typedef struct {
     char* description;
     bool is_optional;
     bool provided; // true if some value was provided. Always true for optional arguments.
-    TypeInterface* interface;
+    TypeInterface interface;
 } Argument;
 
 void panic (const char* msg)
@@ -49,7 +50,7 @@ void panic (const char* msg)
 unsigned int arg_list_count = 0;
 Argument* arg_list[10];
 
-void* argument_add (const char* name, const char* description, TypeInterface* interface,
+void* argument_add (const char* name, const char* description, TypeInterface interface,
                     bool is_optional, ...)
 {
     Argument* new = NULL;
@@ -82,17 +83,17 @@ void* argument_add (const char* name, const char* description, TypeInterface* in
 
     va_list l;
     va_start (l, is_optional);
-    new->interface->alloc (new->interface, l);
+    new->interface.alloc (&new->interface, l);
     va_end (l);
 
     arg_list[arg_list_count++] = new;
 
-    return new->interface->value;
+    return new->interface.value;
 }
 
 void argument_free (Argument* arg)
 {
-    arg->interface->free (arg->interface);
+    arg->interface.free (&arg->interface);
     free (arg->name);
     free (arg->description);
     free (arg);
@@ -127,7 +128,7 @@ bool argument_parse (int argc, char** argv)
             assert ((this->is_optional && this->provided) ||
                     (!this->is_optional && !this->provided));
 
-            this->provided = this->interface->parse_string (this->interface, arg);
+            this->provided = this->interface.parse_string (&this->interface, arg);
             state_is_key   = true; // Now parse new key
         }
     }
@@ -150,9 +151,9 @@ void print_help()
     printf ("USAGE:\n");
     for (unsigned i = 0; i < arg_list_count; i++) {
         Argument* this = arg_list[i];
-        this->interface->to_string (this->interface, value, sizeof (value));
+        this->interface.to_string (&this->interface, value, sizeof (value));
 
-        printf ("  %-10s\t%-20s %s ", this->name, this->interface->format_help, this->description);
+        printf ("  %-10s\t%-20s %s ", this->name, this->interface.format_help, this->description);
         if (this->is_optional) {
             printf ("(Default set to '%s')\n", value);
         } else {
@@ -164,7 +165,7 @@ void print_help()
 /*******************************************************************************************
  * Interfaces
  *********************************************************************************************/
-#define PARENT_OF(self, type, field) ((type*)(self - offsetof (type, field)))
+#define PARENT_OF(self, type, field) ((type*)((uintptr_t)self - offsetof (type, field)))
 
 void generic_free (struct TypeInterface* self)
 {
@@ -325,10 +326,10 @@ TypeInterface String = {
  *********************************************************************************************/
 int main (int argc, char** argv)
 {
-    char* outfile  = argument_add ("out", "Output file path", &String, true, "test.ppm");
-    bool* override = argument_add ("override", "Overrides Output file if it exists", &Boolean,
+    char* outfile  = argument_add ("out", "Output file path", String, true, "test.ppm");
+    bool* override = argument_add ("override", "Overrides Output file if it exists", Boolean,
                                    false);
-    int* gain      = argument_add ("gain", "Gain of the amplifier", &Integer, true, 0);
+    int* gain      = argument_add ("gain", "Gain of the amplifier", Integer, true, 0);
 
     if (!argument_parse (argc, argv)) {
         print_help();
