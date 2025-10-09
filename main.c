@@ -20,38 +20,43 @@
  * }
  */
 
-typedef enum {
-    ARG_TYPE_BOOL,
-    ARG_TYPE_STRING,
-    ARG_TYPE_INTEGER
-} ArgumentTypes;
+#define MAX_NAME_LEN        50  // null byte is not included
+#define MAX_DESCRIPTION_LEN 500 // null byte is not included
+#define MAX_STRING_ARG_LEN  500 // null byte is not included
+
+#define MIN(a, b)           (((a) < (b)) ? (a) : (b))
+
+typedef struct TypeInterface {
+    void* value;
+    void (*alloc) (struct TypeInterface* self, va_list default_value);
+    void (*free) (struct TypeInterface* self);
+    bool (*parse_string) (struct TypeInterface* self, const char* input);
+    void (*to_string) (struct TypeInterface* self, char* out, size_t size);
+    void (*format_help) (char* out, size_t size);
+} TypeInterface;
 
 typedef struct {
     char* name;
     char* description;
     bool is_optional;
     bool provided; // true if some value was provided. Always true for optional arguments.
-    ArgumentTypes type;
-    union {
-        char* string;
-        bool boolean;
-        int integer;
-    } value;
+    TypeInterface* interface;
 } Argument;
-
-#define MAX_NAME_LEN        50  // null byte is not included
-#define MAX_DESCRIPTION_LEN 500 // null byte is not included
-#define MAX_STRING_ARG_LEN  500 // null byte is not included
-
+/*******************************************************************************************
+ * Argument functions
+ *********************************************************************************************/
 unsigned int arg_list_count = 0;
 Argument* arg_list[10];
 
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-
-Argument* argument_alloc (const char* name, const char* description, ArgumentTypes type,
-                          bool is_optional, va_list default_value, void** arg_value)
+void* argument_add (const char* name, const char* description, TypeInterface* interface,
+                    bool is_optional, ...)
 {
     Argument* new = NULL;
+
+    if (arg_list_count >= 10) {
+        return NULL;
+    }
+
     if (!(new = malloc (sizeof (Argument)))) {
         perror ("ERROR: Allocation failed");
         return NULL;
@@ -70,76 +75,26 @@ Argument* argument_alloc (const char* name, const char* description, ArgumentTyp
         return NULL;
     }
 
-    new->type        = type;
     new->is_optional = is_optional;
     new->provided    = is_optional;
+    new->interface   = interface;
 
-    // Default value for optional arguments
-    switch (type) {
-    case ARG_TYPE_BOOL:
-        if (is_optional) {
-            new->value.boolean = va_arg (default_value, int);
-        }
-        *arg_value = &new->value.boolean;
-        break;
-    case ARG_TYPE_INTEGER:
-        if (is_optional) {
-            new->value.integer = va_arg (default_value, int);
-        }
-        *arg_value = &new->value.integer;
-        break;
-    case ARG_TYPE_STRING: {
-        new->value.string = NULL; // Default
-        if (is_optional) {
-            char* input = va_arg (default_value, char*);
-            if (input != NULL) {
-                if (!(new->value.string = strndup (input, MAX_STRING_ARG_LEN))) {
-                    perror ("ERROR: Allocation failed");
-                    return NULL;
-                }
-            }
-        }
-        assert (new->value.string != NULL);
-        *arg_value = &new->value.string;
-    } break;
-    default:
-        assert (false);
-    }
+    va_list l;
+    va_start (l, is_optional);
+    new->interface->alloc (new->interface, l);
+    va_end (l);
 
-    return new;
+    arg_list[arg_list_count++] = new;
+
+    return new->interface->value;
 }
 
 void argument_free (Argument* arg)
 {
-    if (arg->type == ARG_TYPE_STRING && arg->value.string != NULL) {
-        free (arg->value.string);
-    }
-
+    arg->interface->free (arg->interface);
     free (arg->name);
     free (arg->description);
     free (arg);
-}
-
-void* argument_add (const char* name, const char* description, ArgumentTypes type, bool is_optional,
-                    ...)
-{
-    void* ret = NULL;
-
-    if (arg_list_count >= 10) {
-        return NULL; // No space left
-    }
-
-    va_list l;
-    va_start (l, is_optional);
-
-    if (!(arg_list[arg_list_count++] = argument_alloc (name, description, type, is_optional, l,
-                                                       &ret))) {
-        // May be we should just panic on failure.
-        return NULL;
-    }
-    va_end (l);
-
-    return ret;
 }
 
 Argument* find_by_name (const char* needle)
@@ -172,32 +127,8 @@ bool argument_parse (int argc, char** argv)
             assert ((this->is_optional && this->provided) ||
                     (!this->is_optional && !this->provided));
 
-            this->provided = true;
-
-            switch (this->type) {
-            case ARG_TYPE_BOOL: {
-                this->value.boolean = strncmp ("1", arg, MAX_STRING_ARG_LEN) == 0;
-            } break;
-            case ARG_TYPE_INTEGER: {
-                errno               = 0; // To detect is call to strtol failed
-                this->value.integer = strtol (arg, NULL, 10);
-                if (errno == ERANGE) {
-                    perror ("ERROR: Invalid number");
-                    return false;
-                }
-            } break;
-            case ARG_TYPE_STRING: {
-                char* value = strndup (arg, MAX_STRING_ARG_LEN);
-                if (this->value.string != NULL) {
-                    free (this->value.string); // Free default value
-                }
-                this->value.string = value;
-            } break;
-            default:
-                assert (false);
-                break;
-            }
-            state_is_key = true; // Now parse new key
+            this->provided = this->interface->parse_string (this->interface, arg);
+            state_is_key   = true; // Now parse new key
         }
     }
 
@@ -215,33 +146,228 @@ bool argument_parse (int argc, char** argv)
 
 void print_help()
 {
+    char format_help[20]           = { 0 };
+    char value[MAX_STRING_ARG_LEN] = { 0 };
+
     printf ("USAGE:\n");
     for (unsigned i = 0; i < arg_list_count; i++) {
         Argument* this = arg_list[i];
-        printf ("  %-20s\t%s (%s)\n", this->name, this->description,
-                (this->is_optional) ? "TODO" : "Required");
+        this->interface->format_help (format_help, sizeof (format_help));
+        this->interface->to_string (this->interface, value, sizeof (value));
+
+        printf ("  %-10s\t%s %s ", this->name, format_help, this->description);
+        if (this->is_optional) {
+            printf ("(Default set to '%s')\n", value);
+        } else {
+            printf ("(Required)\n");
+        }
     }
 }
 
-void print_arugment (Argument* a)
+/*******************************************************************************************
+ * Interfaces
+ *********************************************************************************************/
+#define PARENT_OF(self, type, field) ((type*)(self - offsetof (type, field)))
+
+void generic_free (struct TypeInterface* self)
 {
-    printf ("Argument:\n name: %s\n description: %s\n type: %d\n value: %s\n", a->name,
-            a->description, a->type, a->value.string);
+    if (self->value != NULL) {
+        free (self->value);
+    }
 }
 
+void bool_alloc (struct TypeInterface* self, va_list default_value)
+{
+    assert (self != NULL);
+
+    self->value = malloc (sizeof (bool));
+
+    Argument* parent = PARENT_OF (self, Argument, interface);
+    assert (parent != NULL);
+
+    if (!parent->is_optional) {
+        *(bool*)self->value = va_arg (default_value, int);
+    }
+}
+
+void int_alloc (struct TypeInterface* self, va_list default_value)
+{
+    assert (self != NULL);
+
+    self->value = malloc (sizeof (int));
+
+    Argument* parent = PARENT_OF (self, Argument, interface);
+    assert (parent != NULL);
+
+    if (!parent->is_optional) {
+        *(int*)self->value = va_arg (default_value, int);
+    }
+}
+
+void string_alloc (struct TypeInterface* self, va_list default_value)
+{
+    assert (self != NULL);
+
+    self->value = malloc (sizeof (char) * MAX_STRING_ARG_LEN);
+
+    Argument* parent = PARENT_OF (self, Argument, interface);
+    assert (parent != NULL);
+
+    if (!parent->is_optional) {
+        strncpy (self->value, va_arg (default_value, char*), MAX_STRING_ARG_LEN);
+    }
+}
+
+bool bool_parse_string (struct TypeInterface* self, const char* input)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+
+    if (strncmp ("true", input, MAX_STRING_ARG_LEN) == 0) {
+        *(bool*)self->value = true;
+    } else if (strncmp ("false", input, MAX_STRING_ARG_LEN) == 0) {
+        *(bool*)self->value = false;
+    } else {
+        fprintf (stderr, "Invalid boolean input\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool int_parse_string (struct TypeInterface* self, const char* input)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+
+    errno              = 0; // To detect if strtol failed
+    *(int*)self->value = strtol (input, NULL, 10);
+    if (errno == ERANGE) {
+        fprintf (stderr, "Invalid integer input\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool string_parse_string (struct TypeInterface* self, const char* input)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+
+    strncpy (self->value, input, MAX_STRING_ARG_LEN);
+    return true;
+}
+
+void bool_to_string (struct TypeInterface* self, char* out, size_t size)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+    assert (out != NULL);
+    assert (size > 0);
+
+    bool value = *(bool*)self->value;
+    strncpy (out, (value) ? "true" : "false", size);
+}
+
+void int_to_string (struct TypeInterface* self, char* out, size_t size)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+    assert (out != NULL);
+    assert (size > 0);
+
+    int value = *(int*)self->value;
+
+    if (value < 0 && size > 1) {
+        *out++ = '-';
+        size--;
+        value *= -1;
+    }
+
+    char* start = out;
+    for (unsigned i = 0; (i == 0 || value > 0) && size > 1 && i < size;
+         i++, value /= 10, out++, size--) {
+        *out = '0' + (value % 10);
+    }
+    *out = '\0';
+
+    for (out--; start < out; out--, start++) {
+        char t = *start;
+        *start = *out;
+        *out   = t;
+    }
+}
+
+void string_to_string (struct TypeInterface* self, char* out, size_t size)
+{
+    assert (self != NULL);
+    assert (self->value != NULL);
+    assert (out != NULL);
+    assert (size > 0);
+
+    strncpy (out, self->value, size);
+}
+
+void bool_format_help (char* out, size_t size)
+{
+    strncpy (out, "(false|true)", size);
+}
+
+void int_format_help (char* out, size_t size)
+{
+    strncpy (out, "(number)", size);
+}
+
+void string_format_help (char* out, size_t size)
+{
+    strncpy (out, "(text)", size);
+}
+
+/*******************************************************************************************
+ * Interface types
+ *********************************************************************************************/
+
+TypeInterface Boolean = {
+    .alloc        = bool_alloc,
+    .free         = generic_free,
+    .parse_string = bool_parse_string,
+    .to_string    = bool_to_string,
+    .format_help  = bool_format_help,
+};
+
+TypeInterface Integer = {
+    .alloc        = int_alloc,
+    .free         = generic_free,
+    .parse_string = int_parse_string,
+    .to_string    = int_to_string,
+    .format_help  = int_format_help,
+};
+
+TypeInterface String = {
+    .alloc        = string_alloc,
+    .free         = generic_free,
+    .parse_string = string_parse_string,
+    .to_string    = string_to_string,
+    .format_help  = string_format_help,
+};
+
+/*******************************************************************************************
+ * Example
+ *********************************************************************************************/
 int main (int argc, char** argv)
 {
-    char** outfile = argument_add ("out", "Output file path", ARG_TYPE_STRING, true, "test.ppm");
-    bool* override = argument_add ("override", "Overrides Output file if it exists", ARG_TYPE_BOOL,
+    char* outfile  = argument_add ("out", "Output file path", &String, true, "test.ppm");
+    bool* override = argument_add ("override", "Overrides Output file if it exists", &Boolean,
                                    false);
-    int* gain      = argument_add ("gain", "Gain of the amplifier", ARG_TYPE_INTEGER, 0);
+    int* gain      = argument_add ("gain", "Gain of the amplifier", &Integer, true, 0);
 
     if (!argument_parse (argc, argv)) {
         print_help();
         return 1;
     }
 
-    printf ("outfile: %s\n", *outfile);
+    printf ("outfile: %s\n", outfile);
     printf ("override: %d\n", *override);
     printf ("gain: %d\n", *gain);
     return 0;
