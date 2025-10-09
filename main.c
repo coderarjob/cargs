@@ -16,7 +16,7 @@ typedef struct TypeInterface {
     void* value;
     char* name;
     char* format_help;
-    void (*alloc) (struct TypeInterface* self, va_list default_value);
+    void (*alloc) (struct TypeInterface* self, va_list* default_value);
     void (*free) (struct TypeInterface* self);
     bool (*parse_string) (struct TypeInterface* self, const char* input);
     void (*to_string) (struct TypeInterface* self, char* out, size_t size);
@@ -83,7 +83,8 @@ void* argument_add (const char* name, const char* description, TypeInterface int
 
     va_list l;
     va_start (l, is_optional);
-    new->interface.alloc (&new->interface, l);
+    va_list* default_value = (is_optional) ? &l : NULL; // Optional args have default value
+    new->interface.alloc (&new->interface, default_value);
     va_end (l);
 
     arg_list[arg_list_count++] = new;
@@ -181,38 +182,22 @@ void generic_free (struct TypeInterface* self)
     }
 }
 
-void generic_alloc (struct TypeInterface* self, va_list default_value)
+void generic_alloc (struct TypeInterface* self, va_list* default_value)
 {
     assert (self != NULL);
 
-    Argument* parent = PARENT_OF (self, Argument, interface);
-    assert (parent != NULL);
-
     size_t sizeof_type = 0;
-    void* value        = NULL;
-
-    int int_value;
-    double double_value;
 
     if (strcmp (self->name, "boolean") == 0) {
         sizeof_type = sizeof (bool);
-        int_value   = va_arg (default_value, int);
-        value       = &int_value;
     } else if (strcmp (self->name, "integer") == 0) {
         sizeof_type = sizeof (int);
-        int_value   = va_arg (default_value, int);
-        value       = &int_value;
     } else if (strcmp (self->name, "string") == 0) {
         sizeof_type = sizeof (char) * MAX_INPUT_VALUE_LEN;
-        value       = va_arg (default_value, char*);
     } else if (strcmp (self->name, "flag") == 0) {
         sizeof_type = sizeof (bool);
-        int_value   = va_arg (default_value, int);
-        value       = &int_value;
     } else if (strcmp (self->name, "double") == 0) {
-        sizeof_type  = sizeof (double);
-        double_value = va_arg (default_value, double);
-        value        = &double_value;
+        sizeof_type = sizeof (double);
     } else {
         assert (false);
     }
@@ -222,10 +207,34 @@ void generic_alloc (struct TypeInterface* self, va_list default_value)
         panic (NULL);
     }
 
-    if (strcmp (self->name, "string") == 0) {
-        strncpy (self->value, value, sizeof_type);
-    } else {
-        memcpy (self->value, value, sizeof_type);
+    if (default_value != NULL) {
+        void* value = NULL;
+        int int_value;
+        double double_value;
+
+        if (strcmp (self->name, "boolean") == 0) {
+            int_value = va_arg (*default_value, int);
+            value     = &int_value;
+        } else if (strcmp (self->name, "integer") == 0) {
+            int_value = va_arg (*default_value, int);
+            value     = &int_value;
+        } else if (strcmp (self->name, "string") == 0) {
+            value = va_arg (*default_value, char*);
+        } else if (strcmp (self->name, "flag") == 0) {
+            int_value = va_arg (*default_value, int);
+            value     = &int_value;
+        } else if (strcmp (self->name, "double") == 0) {
+            double_value = va_arg (*default_value, double);
+            value        = &double_value;
+        } else {
+            assert (false);
+        }
+
+        if (strcmp (self->name, "string") == 0) {
+            strncpy (self->value, value, sizeof_type);
+        } else {
+            memcpy (self->value, value, sizeof_type);
+        }
     }
 }
 
@@ -395,19 +404,17 @@ typedef enum {
     MODES_COUNT
 } Modes;
 
-void modes_alloc (struct TypeInterface* self, va_list default_value)
+void modes_alloc (struct TypeInterface* self, va_list* default_value)
 {
     assert (self != NULL);
-    Argument* this = PARENT_OF (self, Argument, interface);
-    assert (this != NULL);
 
     if (!(self->value = malloc (sizeof (Modes)))) {
         perror ("ERROR: Allocation failed");
         panic (NULL);
     }
 
-    if (this->is_optional) {
-        *(int*)self->value = va_arg (default_value, int);
+    if (default_value != NULL) {
+        *(int*)self->value = va_arg (*default_value, int);
     }
 }
 
