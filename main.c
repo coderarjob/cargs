@@ -395,12 +395,25 @@ int main (int argc, char** argv)
         return 1;
     }
 
+    double* freq = NULL;
+    if (*mode == MODE_AM_WAVE || *mode == MODE_SINE_WAVE) {
+        freq = argument_add ("freq", "Wave frequency", Double, NULL);
+
+        if (!argument_parse (argc, argv)) {
+            print_help();
+            return 1;
+        }
+    }
+
     printf ("outfile: %s\n", outfile);
     printf ("override: %d\n", *override);
     printf ("gain: %d\n", *gain);
     printf ("root: %d\n", *root);
     printf ("offset: %f\n", *offset);
     printf ("mode: %d\n", *mode);
+    if (*mode == MODE_AM_WAVE || *mode == MODE_SINE_WAVE) {
+        printf ("freq: %f\n", *freq);
+    }
 
     for (unsigned i = 0; i < arg_list_count; i++) {
         Argument* this = arg_list[i];
