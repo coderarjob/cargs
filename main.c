@@ -247,10 +247,17 @@ bool flag_parse_string (struct TypeInterface* self, const char* input)
 {
     assert (self != NULL);
     assert (self->value != NULL);
-
     (void)input;
 
-    *(bool*)self->value = true;
+    Argument* this = PARENT_OF (self, Argument, interface);
+    if (strncmp (this->default_value, "false", MAX_INPUT_VALUE_LEN) == 0) {
+        *(bool*)self->value = true;
+    } else if (strncmp (this->default_value, "true", MAX_INPUT_VALUE_LEN) == 0) {
+        *(bool*)self->value = false;
+    } else {
+        panic ("Invalid boolean value");
+    }
+
     return true;
 }
 
