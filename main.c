@@ -176,6 +176,7 @@ void print_help()
  * Interfaces
  *********************************************************************************************/
 #define PARENT_OF(self, type, field) ((type*)((uintptr_t)self - offsetof (type, field)))
+bool bool_parse_string (struct TypeInterface* self, const char* input);
 
 void generic_free (struct TypeInterface* self)
 {
@@ -191,8 +192,15 @@ void default_alloc (struct TypeInterface* self, const char* default_value)
         panic (NULL);
     }
 
-    if (default_value != NULL) {
-        self->parse_string (self, default_value);
+    // Special case for flags. Flag arguments must always have a default value, which gets
+    // later flipped when the flag argument is found during argument parsing.
+    if (strcmp ("flag", self->name) == 0) {
+        assert (default_value != NULL);
+        bool_parse_string (self, default_value);
+    } else {
+        if (default_value != NULL) {
+            self->parse_string (self, default_value);
+        }
     }
 }
 
