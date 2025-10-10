@@ -46,7 +46,8 @@ void panic (const char* msg)
 /*******************************************************************************************
  * Argument functions
  *********************************************************************************************/
-unsigned int arg_list_count = 0;
+unsigned int parsing_done_count = 0;
+unsigned int arg_list_count     = 0;
 Argument* arg_list[10];
 
 void* argument_add (const char* name, const char* description, TypeInterface interface,
@@ -116,17 +117,33 @@ Argument* find_by_name (const char* needle)
     return NULL;
 }
 
+void arguments_reset()
+{
+    // Clear provided field for non-optional arguments
+    for (unsigned i = 0; i < arg_list_count; i++) {
+        Argument* this = arg_list[i];
+        if (this->default_value == NULL) {
+            this->provided = false;
+        }
+    }
+}
+
 bool argument_parse (int argc, char** argv)
 {
     Argument* this    = NULL;
     bool state_is_key = true;
+
+    // Prepare for another parsing of args. Reset few states.
+    if (parsing_done_count > 0) {
+        arguments_reset();
+    }
 
     (void)argc;
     argv++; // Skip first argument
     for (char* arg = NULL; (arg = *argv) != NULL; argv++) {
         if (state_is_key) {
             if (!(this = find_by_name (arg))) {
-                ERROR (false, "Argument '%s' is unknown", arg);
+                continue;
             }
             state_is_key = false; // Now parse value for this key
 
@@ -154,6 +171,8 @@ bool argument_parse (int argc, char** argv)
             ERROR (false, "Argument '%s' is required but was not provided", this->name);
         }
     }
+
+    parsing_done_count++; // Increment the number of times this parsing of argv was done.
     return true;
 }
 
