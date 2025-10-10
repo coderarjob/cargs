@@ -16,8 +16,8 @@ Here is an example:
 ```c
 int main (int argc, char** argv)
 {
-    char* ouput_file = argument_add("O", "Output file path", String, false);
-    bool* should_override = argument_add("override", "Override output file", Flag, true, false);
+    char* output_file = argument_add("O", "Output file path", String, NULL);
+    bool* should_override = argument_add("override", "Override output file", Flag, "false");
 
     if (!argument_parse (argc, argv)) {
         print_help();
