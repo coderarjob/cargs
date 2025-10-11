@@ -218,16 +218,16 @@ bool cargs_parse_input (int argc, char** argv)
 
 void cargs_print_help()
 {
-    printf ("USAGE:\n");
+    printf ("Usage:\n");
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = arg_list[i];
 
-        printf ("  %-10s\t%-20s %s ", the_arg->name, the_arg->interface.format_help,
-                the_arg->description);
+        fprintf (stderr, "  %-10s\t%-20s %s ", the_arg->name, the_arg->interface.format_help,
+                 the_arg->description);
         if (the_arg->default_value) {
-            printf ("(Default set to '%s')\n", the_arg->default_value);
+            fprintf (stderr, "(Default set to '%s')\n", the_arg->default_value);
         } else {
-            printf ("(Required)\n");
+            fprintf (stderr, "(Required)\n");
         }
     }
 }
