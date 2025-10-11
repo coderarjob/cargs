@@ -187,11 +187,16 @@ bool cargs_parse_input (int argc, char** argv)
             }
             state_is_key = false; // Now parse value for this key
 
-            // Special case for flags. They are the only ones with just key and no value, so it
-            // made little sense to add a 'is_flag' field in the Cargs_TypeInterface struct.
             if (strcmp ("flag", the_arg->interface.name) == 0) {
+                // Special case for flags. They are the only ones with just key and no value, so it
+                // made little sense to add a 'is_flag' field in the Cargs_TypeInterface struct.
                 the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg);
                 state_is_key      = true; // Now parse value for this key
+            } else if (strcmp ("help", the_arg->interface.name) == 0) {
+                // Special case for Help. If a help flag is found we skip the rest of the parsing
+                // and simply return.
+                the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg);
+                return true;
             }
         } else {
             assert (the_arg != NULL);
@@ -308,6 +313,8 @@ bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* inpu
     CARGS_UNUSED (input);
 
     CARGS__Argument* the_arg = CARGS_PARENT_OF (self, CARGS__Argument, interface);
+    assert (the_arg->default_value != NULL); // Flags must have a default value
+
     if (strncmp (the_arg->default_value, "false", CARGS_MAX_INPUT_VALUE_LEN) == 0) {
         *(bool*)self->value = true;
     } else if (strncmp (the_arg->default_value, "true", CARGS_MAX_INPUT_VALUE_LEN) == 0) {
@@ -381,4 +388,13 @@ Cargs_TypeInterface Double = {
     .alloc        = cargs_default_alloc,
     .free         = cargs_generic_free,
     .parse_string = cargs_double_parse_string,
+};
+
+Cargs_TypeInterface Help = {
+    .name         = "help",
+    .format_help  = "",
+    .type_size    = sizeof (int),
+    .alloc        = cargs_default_alloc,
+    .free         = cargs_generic_free,
+    .parse_string = cargs_flag_parse_string,
 };

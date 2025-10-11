@@ -40,7 +40,8 @@ Cargs_TypeInterface ModesInterface = {
 
 int main (int argc, char** argv)
 {
-    Modes* mode = cargs_add_arg ("mode", "Mode of wave generation", ModesInterface, NULL);
+    Modes* mode     = cargs_add_arg ("mode", "Mode of wave generation", ModesInterface, NULL);
+    bool* show_help = cargs_add_arg ("h", "Show usage", Help, "false");
 
     if (!cargs_parse_input (argc, argv)) {
         cargs_print_help();
@@ -49,12 +50,17 @@ int main (int argc, char** argv)
 
     double* freq = NULL;
     if (*mode == MODE_AM_WAVE || *mode == MODE_SINE_WAVE) {
-        freq = cargs_add_arg ("freq", "Wave frequency", Double, NULL);
+        freq = cargs_add_arg ("freq", "Sine/AM wave frequency", Double, NULL);
 
         if (!cargs_parse_input (argc, argv)) {
             cargs_print_help();
             return 1;
         }
+    }
+
+    if (*show_help) {
+        cargs_print_help();
+        return 0;
     }
 
     printf ("mode: %d\n", *mode);
