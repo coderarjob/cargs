@@ -255,9 +255,10 @@ void cargs_default_alloc (struct Cargs_TypeInterface* self, const char* default_
         cargs_panic (NULL);
     }
 
-    // Special case for flags. Flag arguments must always have a default value, which gets
-    // later flipped when the flag argument is found during argument parsing.
-    if (strcmp ("flag", self->name) == 0) {
+    // Special case for flags ('help' is also a special flag). Flag arguments must always have a
+    // default value, which gets later flipped when the flag argument is found during argument
+    // parsing.
+    if (strcmp ("flag", self->name) == 0 || strcmp ("help", self->name) == 0) {
         assert (default_value != NULL);
         cargs_bool_parse_string (self, default_value);
     } else {
