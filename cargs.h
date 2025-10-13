@@ -35,6 +35,7 @@ typedef struct Cargs_TypeInterface {
     char* name;
     char* format_help;
     size_t type_size;
+    bool is_flag; // set true for 'flag' arguments which don't need a value from command line
     void (*alloc) (struct Cargs_TypeInterface* self, const char* default_value);
     void (*free) (struct Cargs_TypeInterface* self);
     bool (*parse_string) (struct Cargs_TypeInterface* self, const char* input);
@@ -185,19 +186,19 @@ bool cargs_parse_input (int argc, char** argv)
             if (!(the_arg = CARGS__find_by_name (arg))) {
                 continue;
             }
-            state_is_key = false; // Now parse value for this key
 
-            if (strcmp ("flag", the_arg->interface.name) == 0) {
-                // Special case for flags. They are the only ones with just key and no value, so it
-                // made little sense to add a 'is_flag' field in the Cargs_TypeInterface struct.
+            // Flags do not have a value, so we have to call parse_string (which sets a calculated
+            // value to the flag argument) now when it is first detected.
+            if (the_arg->interface.is_flag) {
                 the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg);
-                state_is_key      = true; // Now parse value for this key
-            } else if (strcmp ("help", the_arg->interface.name) == 0) {
-                // Special case for Help. If a help flag is found we skip the rest of the parsing
-                // and simply return.
-                the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg);
-                return true;
+                // Special case for Help. If a help flag is found we skip the rest of the
+                // parsing and simply return.
+                if (strcmp ("help", the_arg->interface.name) == 0) {
+                    return true;
+                }
             }
+            state_is_key = the_arg->interface.is_flag; // Get value (state_is_key = false) for
+                                                       // non-flag arguments
         } else {
             assert (the_arg != NULL);
             assert ((the_arg->default_value && the_arg->provided) ||
@@ -255,10 +256,9 @@ void cargs_default_alloc (struct Cargs_TypeInterface* self, const char* default_
         cargs_panic (NULL);
     }
 
-    // Special case for flags ('help' is also a special flag). Flag arguments must always have a
-    // default value, which gets later flipped when the flag argument is found during argument
-    // parsing.
-    if (strcmp ("flag", self->name) == 0 || strcmp ("help", self->name) == 0) {
+    // Special case for flags. Flag arguments must always have a default value, which gets acted on
+    // when the flag argument is found during argument parsing.
+    if (self->is_flag) {
         assert (default_value != NULL);
         cargs_bool_parse_string (self, default_value);
     } else {
@@ -377,6 +377,7 @@ Cargs_TypeInterface Flag = {
     .name         = "flag",
     .format_help  = "",
     .type_size    = sizeof (int),
+    .is_flag      = true,
     .alloc        = cargs_default_alloc,
     .free         = cargs_generic_free,
     .parse_string = cargs_flag_parse_string,
@@ -395,6 +396,7 @@ Cargs_TypeInterface Help = {
     .name         = "help",
     .format_help  = "",
     .type_size    = sizeof (int),
+    .is_flag      = true,
     .alloc        = cargs_default_alloc,
     .free         = cargs_generic_free,
     .parse_string = cargs_flag_parse_string,
