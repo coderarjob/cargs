@@ -194,7 +194,7 @@ bool cargs_parse_input (int argc, char** argv)
                 // Special case for Help. If a help flag is found we skip the rest of the
                 // parsing and simply return.
                 if (strcmp ("help", the_arg->interface.name) == 0) {
-                    return true;
+                    goto exit;
                 }
             }
             state_is_key = the_arg->interface.is_flag; // Get value (state_is_key = false) for
@@ -218,6 +218,7 @@ bool cargs_parse_input (int argc, char** argv)
         }
     }
 
+exit:
     CARGS__parsing_done_count++; // Increment the number of times this parsing of argv was done.
     return true;
 }
