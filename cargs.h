@@ -31,14 +31,23 @@
 #define CARGS_UNUSED(v)                    (void)(v)
 
 typedef struct Cargs_TypeInterface {
-    void* value;
+    void* value; // When allow_multiple == true, value if of type Cargs_ArrayList. Rest of the
+                 // fields will remain same as the Type the ArrayList will hold.
     char* name;
     char* format_help;
     size_t type_size;
+    bool allow_multiple;
     bool is_flag; // set true for 'flag' arguments which don't need a value from command line
     bool (*parse_string) (struct Cargs_TypeInterface* self, const char* input, void* out,
                           size_t out_size);
 } Cargs_TypeInterface;
+
+typedef struct {
+    void* buffer;
+    size_t item_size;
+    size_t capacity;
+    size_t len;
+} Cargs_ArrayList;
 
 #define CARGS_ERROR(ret, msg, ...)                           \
     do {                                                     \
@@ -64,6 +73,18 @@ bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* inpu
 bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
                                 size_t out_size);
 
+void* cargs_arl_pop (Cargs_ArrayList* arl);
+
+#define LISTOF(ti)                                                \
+    (assert (!ti.is_flag), (Cargs_TypeInterface){                 \
+                               .name           = ti.name,         \
+                               .format_help    = ti.format_help,  \
+                               .type_size      = ti.type_size,    \
+                               .is_flag        = false,           \
+                               .allow_multiple = true,            \
+                               .parse_string   = ti.parse_string, \
+                           })
+
 #ifdef CARGS_IMPLIMENTATION
 
 typedef struct {
@@ -87,6 +108,74 @@ void cargs_panic (const char* msg)
 }
 
     #define CARGS__MIN(a, b) ((a) > (b) ? (b) : (a))
+    #define CARGS__MAX(a, b) ((a) > (b) ? (a) : (b))
+
+/*******************************************************************************************
+ * ArrayList functions
+ *********************************************************************************************/
+Cargs_ArrayList* CARGS__arl_new_with_capacity (size_t capacity, size_t item_size)
+{
+    if (capacity == 0) {
+        cargs_panic ("Array list must be provided non-zero capacity");
+    }
+
+    Cargs_ArrayList* newlist = (Cargs_ArrayList*)malloc (sizeof (Cargs_ArrayList));
+    if (newlist == NULL) {
+        perror ("ERROR: Allocation failed");
+        cargs_panic (NULL);
+    }
+
+    newlist->capacity  = capacity;
+    newlist->len       = 0;
+    newlist->item_size = item_size;
+    if (newlist->capacity > 0) {
+        if (!(newlist->buffer = malloc (item_size * newlist->capacity))) {
+            perror ("ERROR: Allocation failed");
+            cargs_panic (NULL);
+        }
+    }
+
+    return newlist;
+}
+
+void* CARGS__arl_append (Cargs_ArrayList* arl, void* c)
+{
+    if (arl->len >= arl->capacity) {
+        assert (arl->capacity > 0);
+        arl->capacity *= 2;
+        arl->buffer = (char*)realloc (arl->buffer, arl->capacity);
+        if (arl->buffer == NULL) {
+            perror ("ERROR: Relocation failed");
+            cargs_panic (NULL);
+        }
+    }
+    void* dest = (void*)((uintptr_t)arl->buffer + (arl->len * arl->item_size));
+    if (c != NULL) {
+        memcpy (dest, c, arl->item_size);
+    }
+    arl->len++;
+    return dest;
+}
+
+void* cargs_arl_pop (Cargs_ArrayList* arl)
+{
+    if (arl->len > 0) {
+        arl->len--;
+        void* item = (void*)((uintptr_t)arl->buffer + (arl->len * arl->item_size));
+        return item;
+    }
+
+    return NULL;
+}
+
+void* CARGS__arl_dealloc (Cargs_ArrayList* arl)
+{
+    assert (arl != NULL);
+    free (arl->buffer);
+    free (arl);
+    return NULL;
+}
+
 /*******************************************************************************************
  * Argument functions
  *********************************************************************************************/
@@ -143,12 +232,19 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
 
     new_arg->provided  = default_value != NULL;
     new_arg->interface = interface;
-    if (!(new_arg->interface.value = malloc (new_arg->interface.type_size))) {
-        perror ("ERROR: Allocation failed");
-        cargs_panic (NULL);
-    }
+    if (interface.allow_multiple) {
+        if (default_value != NULL) {
+            cargs_panic ("Lists do not have a default value");
+        }
+        new_arg->interface.value = CARGS__arl_new_with_capacity (10, interface.type_size);
+    } else {
+        if (!(new_arg->interface.value = malloc (new_arg->interface.type_size))) {
+            perror ("ERROR: Allocation failed");
+            cargs_panic (NULL);
+        }
 
-    CARGS__assign_value (&new_arg->interface, default_value);
+        CARGS__assign_value (&new_arg->interface, default_value);
+    }
 
     CARGS__arg_list[CARGS__arg_list_count++] = new_arg;
 
@@ -160,7 +256,11 @@ void cargs_cleanup()
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* arg = CARGS__arg_list[i];
         if (arg->interface.value != NULL) {
-            free (arg->interface.value);
+            if (arg->interface.allow_multiple) {
+                CARGS__arl_dealloc ((Cargs_ArrayList*)arg->interface.value);
+            } else {
+                free (arg->interface.value);
+            }
         }
         free (arg->name);
         free (arg->description);
@@ -196,7 +296,6 @@ void CARGS__arguments_reset()
 bool cargs_parse_input (int argc, char** argv)
 {
     CARGS__Argument* the_arg = NULL;
-    bool state_is_key        = true;
 
     // Prepare for another parsing of args. Reset few states.
     if (CARGS__parsing_done_count > 0) {
@@ -206,8 +305,13 @@ bool cargs_parse_input (int argc, char** argv)
     CARGS_UNUSED (argc);
     argv++; // Skip first argument
     for (char* arg = NULL; (arg = *argv) != NULL; argv++) {
-        if (state_is_key) {
+        // TODO: argument value/parameter might start with CARGS__ARGUMENT_PREFIX_CHAR
+
+        if (arg[0] == CARGS__ARGUMENT_PREFIX_CHAR) {
             if (!(the_arg = CARGS__find_by_name (arg))) {
+                // This can occur for conditional arguments, when the first pass will sweep across
+                // arguments which is not yet known.
+                // TODO: Handle unknwon argument properly.
                 continue;
             }
 
@@ -223,21 +327,35 @@ bool cargs_parse_input (int argc, char** argv)
                     goto exit;
                 }
             }
-            state_is_key = the_arg->interface.is_flag; // Get value (state_is_key = false) for
-                                                       // non-flag arguments
         } else {
-            assert (the_arg != NULL);
-            assert ((the_arg->default_value && the_arg->provided) ||
-                    (!the_arg->default_value && !the_arg->provided));
+            if (the_arg == NULL) {
+                // This can occur for conditional arguments, when the first pass will sweep across
+                // arguments which is not yet known.
 
-            the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
-                                                                 the_arg->interface.value,
-                                                                 the_arg->interface.type_size);
-            state_is_key      = true; // Now parse new key
+                // TODO: Handle paramter without an argument
+                continue;
+            }
+
+            assert (the_arg != NULL);
+
+            if (the_arg->interface.allow_multiple) {
+                void* new_item = CARGS__arl_append ((Cargs_ArrayList*)the_arg->interface.value,
+                                                    NULL); // Dummy insert
+                assert (new_item != NULL);
+
+                the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
+                                                                     new_item,
+                                                                     the_arg->interface.type_size);
+            } else {
+                assert ((the_arg->default_value && the_arg->provided) ||
+                        (!the_arg->default_value && !the_arg->provided));
+
+                the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
+                                                                     the_arg->interface.value,
+                                                                     the_arg->interface.type_size);
+            }
         }
     }
-
-    assert (state_is_key == true);
 
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
