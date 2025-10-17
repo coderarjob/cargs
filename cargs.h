@@ -74,7 +74,7 @@ typedef struct {
 
 unsigned int CARGS__parsing_done_count = 0;
 unsigned int CARGS__arg_list_count     = 0;
-CARGS__Argument* arg_list[10];
+CARGS__Argument* CARGS__arg_list[10];
 
 void cargs_panic (const char* msg)
 {
@@ -128,7 +128,7 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
     new_arg->interface = interface;
     new_arg->interface.alloc (&new_arg->interface, default_value);
 
-    arg_list[CARGS__arg_list_count++] = new_arg;
+    CARGS__arg_list[CARGS__arg_list_count++] = new_arg;
 
     return new_arg->interface.value;
 }
@@ -136,7 +136,7 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
 void cargs_cleanup()
 {
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* arg = arg_list[i];
+        CARGS__Argument* arg = CARGS__arg_list[i];
         arg->interface.free (&arg->interface);
         free (arg->name);
         free (arg->description);
@@ -150,7 +150,7 @@ void cargs_cleanup()
 CARGS__Argument* CARGS__find_by_name (const char* needle)
 {
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* arg = arg_list[i];
+        CARGS__Argument* arg = CARGS__arg_list[i];
         if (strncmp (arg->name, needle, CARGS__MAX_NAME_LEN) == 0) {
             return arg;
         }
@@ -162,7 +162,7 @@ void CARGS__arguments_reset()
 {
     // Clear provided field for non-optional arguments
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* arg = arg_list[i];
+        CARGS__Argument* arg = CARGS__arg_list[i];
         if (arg->default_value == NULL) {
             arg->provided = false;
         }
@@ -212,7 +212,7 @@ bool cargs_parse_input (int argc, char** argv)
     assert (state_is_key == true);
 
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* the_arg = arg_list[i];
+        CARGS__Argument* the_arg = CARGS__arg_list[i];
         if (!the_arg->provided) {
             CARGS_ERROR (false, "Argument '%s' is required but was not provided", the_arg->name);
         }
@@ -227,7 +227,7 @@ void cargs_print_help()
 {
     printf ("Usage:\n");
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* the_arg = arg_list[i];
+        CARGS__Argument* the_arg = CARGS__arg_list[i];
 
         fprintf (stderr, "  %-10s\t%-20s %s ", the_arg->name, the_arg->interface.format_help,
                  the_arg->description);
