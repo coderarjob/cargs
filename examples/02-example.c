@@ -10,9 +10,16 @@ typedef enum {
     MODES_COUNT
 } Modes;
 
-bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input)
+bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
+                         size_t out_len)
 {
+#ifdef NDEBUG
     assert (self != NULL);
+    assert (out_len == sizeof (Modes));
+#else
+    CARGS_UNUSED (self);
+    CARGS_UNUSED (out_len);
+#endif // NDEBUG
 
     Modes mode = 0;
     if (strncmp ("sine", input, CARGS_MAX_INPUT_VALUE_LEN) == 0) {
@@ -25,7 +32,7 @@ bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input)
         CARGS_ERROR (false, "Invalid mode: '%s'", input);
     }
 
-    *(Modes*)self->value = mode;
+    *(Modes*)out = mode;
     return true;
 }
 
