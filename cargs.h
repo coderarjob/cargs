@@ -36,8 +36,6 @@ typedef struct Cargs_TypeInterface {
     char* format_help;
     size_t type_size;
     bool is_flag; // set true for 'flag' arguments which don't need a value from command line
-    void (*alloc) (struct Cargs_TypeInterface* self, const char* default_value);
-    void (*free) (struct Cargs_TypeInterface* self);
     bool (*parse_string) (struct Cargs_TypeInterface* self, const char* input, void* out,
                           size_t out_size);
 } Cargs_TypeInterface;
@@ -55,8 +53,6 @@ void cargs_cleanup();
 bool cargs_parse_input (int argc, char** argv);
 void cargs_print_help();
 
-void cargs_generic_free (struct Cargs_TypeInterface* self);
-void cargs_default_alloc (struct Cargs_TypeInterface* self, const char* default_value);
 bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
                               size_t out_size);
 bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
@@ -94,6 +90,20 @@ void cargs_panic (const char* msg)
 /*******************************************************************************************
  * Argument functions
  *********************************************************************************************/
+void CARGS__assign_value (Cargs_TypeInterface* interface, const char* input)
+{
+    // Special case for flags. Flag arguments must always have a default value, which gets acted on
+    // when the flag argument is found during argument parsing.
+    if (interface->is_flag) {
+        assert (input != NULL);
+        cargs_bool_parse_string (interface, input, interface->value, interface->type_size);
+    } else {
+        if (input != NULL) {
+            interface->parse_string (interface, input, interface->value, interface->type_size);
+        }
+    }
+}
+
 void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterface interface,
                      const char* default_value)
 {
@@ -133,7 +143,12 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
 
     new_arg->provided  = default_value != NULL;
     new_arg->interface = interface;
-    new_arg->interface.alloc (&new_arg->interface, default_value);
+    if (!(new_arg->interface.value = malloc (new_arg->interface.type_size))) {
+        perror ("ERROR: Allocation failed");
+        cargs_panic (NULL);
+    }
+
+    CARGS__assign_value (&new_arg->interface, default_value);
 
     CARGS__arg_list[CARGS__arg_list_count++] = new_arg;
 
@@ -144,7 +159,9 @@ void cargs_cleanup()
 {
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* arg = CARGS__arg_list[i];
-        arg->interface.free (&arg->interface);
+        if (arg->interface.value != NULL) {
+            free (arg->interface.value);
+        }
         free (arg->name);
         free (arg->description);
         if (arg->default_value) {
@@ -254,32 +271,6 @@ void cargs_print_help()
  * Interfaces
  *********************************************************************************************/
 
-void cargs_generic_free (struct Cargs_TypeInterface* self)
-{
-    if (self->value != NULL) {
-        free (self->value);
-    }
-}
-
-void cargs_default_alloc (struct Cargs_TypeInterface* self, const char* default_value)
-{
-    if (!(self->value = malloc (self->type_size))) {
-        perror ("ERROR: Allocation failed");
-        cargs_panic (NULL);
-    }
-
-    // Special case for flags. Flag arguments must always have a default value, which gets acted on
-    // when the flag argument is found during argument parsing.
-    if (self->is_flag) {
-        assert (default_value != NULL);
-        cargs_bool_parse_string (self, default_value, self->value, self->type_size);
-    } else {
-        if (default_value != NULL) {
-            self->parse_string (self, default_value, self->value, self->type_size);
-        }
-    }
-}
-
 bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
                               size_t out_size)
 {
@@ -383,8 +374,6 @@ Cargs_TypeInterface Boolean = {
     .name         = "boolean",
     .format_help  = "(false|true)",
     .type_size    = sizeof (bool),
-    .alloc        = cargs_default_alloc,
-    .free         = cargs_generic_free,
     .parse_string = cargs_bool_parse_string,
 };
 
@@ -392,8 +381,6 @@ Cargs_TypeInterface Integer = {
     .name         = "integer",
     .format_help  = "(number)",
     .type_size    = sizeof (int),
-    .alloc        = cargs_default_alloc,
-    .free         = cargs_generic_free,
     .parse_string = cargs_int_parse_string,
 };
 
@@ -401,8 +388,6 @@ Cargs_TypeInterface String = {
     .name         = "string",
     .format_help  = "(text)",
     .type_size    = sizeof (char) * CARGS_MAX_INPUT_VALUE_LEN,
-    .alloc        = cargs_default_alloc,
-    .free         = cargs_generic_free,
     .parse_string = cargs_string_parse_string,
 };
 
@@ -411,8 +396,6 @@ Cargs_TypeInterface Flag = {
     .format_help  = "",
     .type_size    = sizeof (bool),
     .is_flag      = true,
-    .alloc        = cargs_default_alloc,
-    .free         = cargs_generic_free,
     .parse_string = cargs_flag_parse_string,
 };
 
@@ -420,8 +403,6 @@ Cargs_TypeInterface Double = {
     .name         = "double",
     .format_help  = "(decimal number)",
     .type_size    = sizeof (double),
-    .alloc        = cargs_default_alloc,
-    .free         = cargs_generic_free,
     .parse_string = cargs_double_parse_string,
 };
 
@@ -430,7 +411,5 @@ Cargs_TypeInterface Help = {
     .format_help  = "",
     .type_size    = sizeof (bool),
     .is_flag      = true,
-    .alloc        = cargs_default_alloc,
-    .free         = cargs_generic_free,
     .parse_string = cargs_flag_parse_string,
 };

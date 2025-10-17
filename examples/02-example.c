@@ -39,9 +39,7 @@ bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input, vo
 Cargs_TypeInterface ModesInterface = {
     .name         = "Modes",
     .format_help  = "(sine|am|noise)",
-    .alloc        = cargs_default_alloc,
     .type_size    = sizeof (Modes),
-    .free         = cargs_generic_free,
     .parse_string = modes_parse_string,
 };
 
