@@ -10,15 +10,13 @@ typedef enum {
     MODES_COUNT
 } Modes;
 
-bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                         size_t out_len)
+bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out)
 {
 #ifdef NDEBUG
     assert (self != NULL);
-    assert (out_len == sizeof (Modes));
+    assert (out.len == sizeof (Modes));
 #else
     CARGS_UNUSED (self);
-    CARGS_UNUSED (out_len);
 #endif // NDEBUG
 
     Modes mode = 0;
@@ -32,7 +30,7 @@ bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input, vo
         CARGS_ERROR (false, "Invalid mode: '%s'", input);
     }
 
-    *(Modes*)out = mode;
+    *(Modes*)out.address = mode;
     return true;
 }
 

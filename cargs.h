@@ -30,6 +30,11 @@
 
 #define CARGS_UNUSED(v)                    (void)(v)
 
+typedef struct {
+    void* address;
+    size_t len;
+} Cargs_Slice;
+
 typedef struct Cargs_TypeInterface {
     void* value; // When allow_multiple == true, value if of type Cargs_ArrayList. Rest of the
                  // fields will remain same as the Type the ArrayList will hold.
@@ -38,8 +43,7 @@ typedef struct Cargs_TypeInterface {
     size_t type_size;
     bool allow_multiple;
     bool is_flag; // set true for 'flag' arguments which don't need a value from command line
-    bool (*parse_string) (struct Cargs_TypeInterface* self, const char* input, void* out,
-                          size_t out_size);
+    bool (*parse_string) (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out);
 } Cargs_TypeInterface;
 
 typedef struct {
@@ -62,16 +66,13 @@ void cargs_cleanup();
 bool cargs_parse_input (int argc, char** argv);
 void cargs_print_help();
 
-bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                              size_t out_size);
-bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                             size_t out_size);
-bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                                size_t out_size);
-bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                              size_t out_size);
-bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                                size_t out_size);
+bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out);
+bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out);
+bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* input,
+                                Cargs_Slice out);
+bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out);
+bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* input,
+                                Cargs_Slice out);
 
 void* cargs_arl_pop (Cargs_ArrayList* arl);
 
@@ -109,6 +110,12 @@ void cargs_panic (const char* msg)
 
     #define CARGS__MIN(a, b) ((a) > (b) ? (b) : (a))
     #define CARGS__MAX(a, b) ((a) > (b) ? (a) : (b))
+
+    #define CARGS__SLICE_OF(a, l)      \
+        (Cargs_Slice)                  \
+        {                              \
+            .address = (a), .len = (l) \
+        }
 
 /*******************************************************************************************
  * ArrayList functions
@@ -185,10 +192,12 @@ void CARGS__assign_value (Cargs_TypeInterface* interface, const char* input)
     // when the flag argument is found during argument parsing.
     if (interface->is_flag) {
         assert (input != NULL);
-        cargs_bool_parse_string (interface, input, interface->value, interface->type_size);
+        cargs_bool_parse_string (interface, input,
+                                 CARGS__SLICE_OF (interface->value, interface->type_size));
     } else {
         if (input != NULL) {
-            interface->parse_string (interface, input, interface->value, interface->type_size);
+            interface->parse_string (interface, input,
+                                     CARGS__SLICE_OF (interface->value, interface->type_size));
         }
     }
 }
@@ -318,9 +327,9 @@ bool cargs_parse_input (int argc, char** argv)
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
             // value to the flag argument) now when it is first detected.
             if (the_arg->interface.is_flag) {
-                the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
-                                                                     the_arg->interface.value,
-                                                                     the_arg->interface.type_size);
+                the_arg->provided = the_arg->interface.parse_string (
+                    &the_arg->interface, arg,
+                    CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size));
                 // Special case for Help. If a help flag is found we skip the rest of the
                 // parsing and simply return.
                 if (strcmp ("help", the_arg->interface.name) == 0) {
@@ -343,16 +352,16 @@ bool cargs_parse_input (int argc, char** argv)
                                                     NULL); // Dummy insert
                 assert (new_item != NULL);
 
-                the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
-                                                                     new_item,
-                                                                     the_arg->interface.type_size);
+                the_arg->provided = the_arg->interface.parse_string (
+                    &the_arg->interface, arg,
+                    CARGS__SLICE_OF (new_item, the_arg->interface.type_size));
             } else {
                 assert ((the_arg->default_value && the_arg->provided) ||
                         (!the_arg->default_value && !the_arg->provided));
 
-                the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
-                                                                     the_arg->interface.value,
-                                                                     the_arg->interface.type_size);
+                the_arg->provided = the_arg->interface.parse_string (
+                    &the_arg->interface, arg,
+                    CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size));
             }
         }
     }
@@ -389,19 +398,17 @@ void cargs_print_help()
  * Interfaces
  *********************************************************************************************/
 
-bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                              size_t out_size)
+bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out)
 {
     assert (self != NULL);
     assert (self->value != NULL);
-    assert (out_size == sizeof (bool));
+    assert (out.len == sizeof (bool));
     CARGS_UNUSED (self);
-    CARGS_UNUSED (out_size);
 
     if (strncmp ("true", input, CARGS_MAX_INPUT_VALUE_LEN) == 0) {
-        *(bool*)out = true;
+        *(bool*)out.address = true;
     } else if (strncmp ("false", input, CARGS_MAX_INPUT_VALUE_LEN) == 0) {
-        *(bool*)out = false;
+        *(bool*)out.address = false;
     } else {
         CARGS_ERROR (false, "Invalid boolean input");
     }
@@ -409,19 +416,17 @@ bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* inpu
     return true;
 }
 
-bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                             size_t out_size)
+bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out)
 {
     assert (self != NULL);
     assert (self->value != NULL);
-    assert (out_size == sizeof (int));
-    CARGS_UNUSED (out_size);
+    assert (out.len == sizeof (int));
     CARGS_UNUSED (self);
 
     // TODO: strtol does not take length as an input. Bufffer overflow/security issue possible.
 
-    errno      = 0; // To detect if strtol failed
-    *(int*)out = strtol (input, NULL, 10);
+    errno              = 0; // To detect if strtol failed
+    *(int*)out.address = strtol (input, NULL, 10);
     if (errno == ERANGE) {
         CARGS_ERROR (false, "Invalid integer input");
     }
@@ -429,33 +434,31 @@ bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input
     return true;
 }
 
-bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                                size_t out_size)
+bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* input,
+                                Cargs_Slice out)
 {
     assert (self != NULL);
     assert (self->value != NULL);
     CARGS_UNUSED (self);
 
-    strncpy ((char*)out, input, CARGS__MIN (CARGS_MAX_INPUT_VALUE_LEN, out_size));
+    strncpy ((char*)out.address, input, CARGS__MIN (CARGS_MAX_INPUT_VALUE_LEN, out.len));
     return true;
 }
 
-bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                              size_t out_size)
+bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out)
 {
     assert (self != NULL);
     assert (self->value != NULL);
-    assert (out_size == sizeof (bool));
+    assert (out.len == sizeof (bool));
     CARGS_UNUSED (input);
-    CARGS_UNUSED (out_size);
 
     CARGS__Argument* the_arg = CARGS_PARENT_OF (self, CARGS__Argument, interface);
     assert (the_arg->default_value != NULL); // Flags must have a default value
 
     if (strncmp (the_arg->default_value, "false", CARGS_MAX_INPUT_VALUE_LEN) == 0) {
-        *(bool*)out = true;
+        *(bool*)out.address = true;
     } else if (strncmp (the_arg->default_value, "true", CARGS_MAX_INPUT_VALUE_LEN) == 0) {
-        *(bool*)out = false;
+        *(bool*)out.address = false;
     } else {
         cargs_panic ("Invalid boolean value");
     }
@@ -463,19 +466,19 @@ bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* inpu
     return true;
 }
 
-bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* input, void* out,
-                                size_t out_size)
+bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* input,
+                                Cargs_Slice out)
 {
     assert (self != NULL);
     assert (self->value != NULL);
-    assert (out_size == sizeof (double));
-    CARGS_UNUSED (out_size);
+    assert (out.len == sizeof (double));
     CARGS_UNUSED (self);
 
     // TODO: strtod does not take length as an input. Bufffer overflow/security issue possible
 
-    errno         = 0; // To detect if strtol failed
-    *(double*)out = strtod (input, NULL);
+    errno = 0; // To detect if strtol failed
+
+    *(double*)out.address = strtod (input, NULL);
     if (errno == ERANGE) {
         CARGS_ERROR (false, "Invalid floating point input");
     }
