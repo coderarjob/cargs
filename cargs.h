@@ -75,7 +75,7 @@ bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* in
 
 void* cargs_arl_pop (Cargs_ArrayList* arl);
 
-#define LISTOF(ti)                                                \
+#define CARGS_LISTOF(ti)                                          \
     (assert (!ti.is_flag), (Cargs_TypeInterface){                 \
                                .name           = ti.name,         \
                                .format_help    = ti.format_help,  \

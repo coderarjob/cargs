@@ -20,8 +20,8 @@ int main (int argc, char** argv)
 {
     bool* encrypt          = cargs_add_arg ("e", "Encrypt", Boolean, NULL);
     char* key              = cargs_add_arg ("k", "16 byte key (as argument)", String, NULL);
-    Cargs_ArrayList* files = cargs_add_arg ("I", "Input files to be processed", LISTOF (String),
-                                            NULL);
+    Cargs_ArrayList* files = cargs_add_arg ("I", "Input files to be processed",
+                                            CARGS_LISTOF (String), NULL);
     bool* show_help        = cargs_add_arg ("h", "Show usage", Help, "false");
 
     if (!cargs_parse_input (argc, argv)) {
