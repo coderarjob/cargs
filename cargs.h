@@ -155,7 +155,7 @@ void* CARGS__arl_append (Cargs_ArrayList* arl, void* c)
     if (arl->len >= arl->capacity) {
         assert (arl->capacity > 0);
         arl->capacity *= 2;
-        arl->buffer = (char*)realloc (arl->buffer, arl->capacity);
+        arl->buffer = realloc (arl->buffer, arl->item_size * arl->capacity);
         if (arl->buffer == NULL) {
             perror ("ERROR: Relocation failed");
             cargs_panic (NULL);
