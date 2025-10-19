@@ -94,6 +94,7 @@ typedef struct CARGS__Argument {
     char* description;
     char* default_value;
     bool provided; // true if some value was provided. Always true for optional arguments.
+    bool dirty;    // true mean value was updated during parsing.
     Cargs_TypeInterface interface;
     struct {
         struct CARGS__Argument* parent_arg;
@@ -292,7 +293,8 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
         new_arg->default_value = NULL;
     }
 
-    new_arg->provided                = default_value != NULL;
+    new_arg->dirty    = false; // Initially args are not dirty. Becomes dirty if was modified later.
+    new_arg->provided = default_value != NULL;
     new_arg->interface               = interface;
     new_arg->condition.is_enabled_fn = NULL;
     new_arg->condition.parent_arg    = NULL;
@@ -362,6 +364,9 @@ bool cargs_parse_input (int argc, char** argv)
                 CARGS_ERROR (false, "ERROR: Unknown argument '%s'", arg);
             }
 
+            // Args updated during parsing are flaged dirty
+            the_arg->dirty = true;
+
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
             // value to the flag argument) now when it is first detected.
             if (the_arg->interface.is_flag) {
@@ -398,12 +403,17 @@ bool cargs_parse_input (int argc, char** argv)
 
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
-        if (!CARGS__is_arg_condition_enabled (the_arg)) {
-            continue; // Condition is not met for the argument, which means this argument is
-                      // inactive
-        }
-        if (!the_arg->provided) {
-            CARGS_ERROR (false, "Argument '%s' is required but was not provided", the_arg->name);
+        if (CARGS__is_arg_condition_enabled (the_arg)) {
+            // Argument is enabled but not provided.
+            if (!the_arg->provided) {
+                CARGS_ERROR (false, "Argument '%s' is required but was not provided",
+                             the_arg->name);
+            }
+        } else {
+            // Argument is not enabled but was provided.
+            if (the_arg->dirty) {
+                CARGS_ERROR (false, "Argument '%s' has no effect", the_arg->name);
+            }
         }
     }
 
