@@ -226,8 +226,7 @@ bool CARGS__is_arg_condition_enabled (CARGS__Argument* arg)
         if (parent_arg->interface.allow_multiple) {
             return ((Cargs_ArrayList*)parent_arg->interface.value)->len > 0;
         } else {
-            return CARGS__is_arg_condition_enabled (parent_arg) && parent_arg->provided &&
-                   arg->condition.is_enabled_fn();
+            return arg->condition.is_enabled_fn();
         }
     }
     return true;
