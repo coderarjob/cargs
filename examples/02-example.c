@@ -43,7 +43,7 @@ Cargs_TypeInterface ModesInterface = {
 };
 
 typedef struct {
-    Modes* mode;
+    Modes* do_encrypt;
     bool* show_help;
     double* freq;
     bool* interpolate;
@@ -53,15 +53,15 @@ Config config = { 0 };
 
 static bool freq_is_enabled (void)
 {
-    return (*config.mode == MODE_AM_WAVE || *config.mode == MODE_SINE_WAVE);
+    return (*config.do_encrypt == MODE_AM_WAVE || *config.do_encrypt == MODE_SINE_WAVE);
 }
 
 int main (int argc, char** argv)
 {
-    config.mode      = cargs_add_arg ("mode", "Mode of wave generation", ModesInterface, NULL);
-    config.show_help = cargs_add_arg ("h", "Show usage", Help, "false");
-    config.freq = cargs_add_subarg (config.mode, freq_is_enabled, "freq", "Sine/AM wave frequency",
-                                    Double, NULL);
+    config.do_encrypt = cargs_add_arg ("mode", "Mode of wave generation", ModesInterface, NULL);
+    config.show_help  = cargs_add_arg ("h", "Show usage", Help, "false");
+    config.freq       = cargs_add_subarg (config.do_encrypt, freq_is_enabled, "freq",
+                                          "Sine/AM wave frequency", Double, NULL);
 
     if (!cargs_parse_input (argc, argv)) {
         cargs_print_help();
@@ -73,7 +73,7 @@ int main (int argc, char** argv)
         return 0;
     }
 
-    printf ("mode: %d\n", *config.mode);
+    printf ("mode: %d\n", *config.do_encrypt);
     printf ("freq: %f\n", *config.freq);
 
     cargs_cleanup();
