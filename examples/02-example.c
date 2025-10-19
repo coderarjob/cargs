@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 
 #define CARGS_IMPLIMENTATION
@@ -41,35 +42,39 @@ Cargs_TypeInterface ModesInterface = {
     .parse_string = modes_parse_string,
 };
 
+typedef struct {
+    Modes* mode;
+    bool* show_help;
+    double* freq;
+    bool* interpolate;
+} Config;
+
+Config config = { 0 };
+
+static bool freq_is_enabled (void)
+{
+    return (*config.mode == MODE_AM_WAVE || *config.mode == MODE_SINE_WAVE);
+}
+
 int main (int argc, char** argv)
 {
-    Modes* mode     = cargs_add_arg ("mode", "Mode of wave generation", ModesInterface, NULL);
-    bool* show_help = cargs_add_arg ("h", "Show usage", Help, "false");
+    config.mode      = cargs_add_arg ("mode", "Mode of wave generation", ModesInterface, NULL);
+    config.show_help = cargs_add_arg ("h", "Show usage", Help, "false");
+    config.freq = cargs_add_subarg (config.mode, freq_is_enabled, "freq", "Sine/AM wave frequency",
+                                    Double, NULL);
 
     if (!cargs_parse_input (argc, argv)) {
         cargs_print_help();
         return 1;
     }
 
-    double* freq = NULL;
-    if (*mode == MODE_AM_WAVE || *mode == MODE_SINE_WAVE) {
-        freq = cargs_add_arg ("freq", "Sine/AM wave frequency", Double, NULL);
-
-        if (!cargs_parse_input (argc, argv)) {
-            cargs_print_help();
-            return 1;
-        }
-    }
-
-    if (*show_help) {
+    if (*config.show_help) {
         cargs_print_help();
         return 0;
     }
 
-    printf ("mode: %d\n", *mode);
-    if (*mode == MODE_AM_WAVE || *mode == MODE_SINE_WAVE) {
-        printf ("freq: %f\n", *freq);
-    }
+    printf ("mode: %d\n", *config.mode);
+    printf ("freq: %f\n", *config.freq);
 
     cargs_cleanup();
     return 0;

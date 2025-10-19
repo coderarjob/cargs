@@ -12,13 +12,11 @@
 #define CARGS__MAX_NAME_LEN        50  // null byte is not included
 #define CARGS__MAX_DESCRIPTION_LEN 100 // null byte is not included
 
-#ifdef CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE
-    #define CARGS_MAX_INPUT_VALUE_LEN \
-        CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE // null byte is not included
+#ifdef CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE // null byte is not included
+    #define CARGS_MAX_INPUT_VALUE_LEN CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE
 #else
     #define CARGS_MAX_INPUT_VALUE_LEN 100 // null byte is not included
-
-#endif // CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE
+#endif                                    // CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE
 
 #ifdef CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE
     #define CARGS__ARGUMENT_PREFIX_CHAR CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE
@@ -60,6 +58,9 @@ typedef struct {
     } while (0)
 
 void cargs_panic (const char* msg);
+void* cargs_add_subarg (void* parent_arg_value_addr, bool (*is_enabled_fn) (void), const char* name,
+                        const char* description, Cargs_TypeInterface interface,
+                        const char* default_value);
 void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterface interface,
                      const char* default_value);
 void cargs_cleanup();
@@ -88,12 +89,16 @@ void* cargs_arl_pop (Cargs_ArrayList* arl);
 
 #ifdef CARGS_IMPLIMENTATION
 
-typedef struct {
+typedef struct CARGS__Argument {
     char* name;
     char* description;
     char* default_value;
     bool provided; // true if some value was provided. Always true for optional arguments.
     Cargs_TypeInterface interface;
+    struct {
+        struct CARGS__Argument* parent_arg;
+        bool (*is_enabled_fn) (void);
+    } condition;
 } CARGS__Argument;
 
 unsigned int CARGS__parsing_done_count = 0;
@@ -202,6 +207,54 @@ void CARGS__assign_value (Cargs_TypeInterface* interface, const char* input)
     }
 }
 
+CARGS__Argument* CARGS__find_by_value_address (const void* needle)
+{
+    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
+        CARGS__Argument* arg = CARGS__arg_list[i];
+        if (arg->interface.value == needle) {
+            return arg;
+        }
+    }
+    return NULL;
+}
+
+bool CARGS__is_arg_condition_enabled (CARGS__Argument* arg)
+{
+    if (arg->condition.parent_arg != NULL) {
+        CARGS__Argument* parent_arg = arg->condition.parent_arg;
+        if (parent_arg->interface.allow_multiple) {
+            return ((Cargs_ArrayList*)parent_arg->interface.value)->len > 0;
+        } else {
+            return CARGS__is_arg_condition_enabled (parent_arg) && parent_arg->provided &&
+                   arg->condition.is_enabled_fn();
+        }
+    }
+    return true;
+}
+
+void* cargs_add_subarg (void* parent_arg_value_addr, bool (*is_enabled_fn) (void), const char* name,
+                        const char* description, Cargs_TypeInterface interface,
+                        const char* default_value)
+{
+    CARGS__Argument* parent_arg = CARGS__find_by_value_address (parent_arg_value_addr);
+    assert (parent_arg != NULL);
+
+    if (parent_arg->interface.allow_multiple && is_enabled_fn != NULL) {
+        cargs_panic ("Sub command of List argument are automatically enabled/disabled.");
+    }
+
+    void* new_arg_value_addr = cargs_add_arg (name, description, interface, default_value);
+    assert (new_arg_value_addr != NULL);
+
+    CARGS__Argument* new_arg = CARGS__find_by_value_address (new_arg_value_addr);
+    assert (new_arg != NULL);
+
+    new_arg->condition.is_enabled_fn = is_enabled_fn;
+    new_arg->condition.parent_arg    = parent_arg;
+
+    return new_arg_value_addr;
+}
+
 void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterface interface,
                      const char* default_value)
 {
@@ -239,8 +292,11 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
         new_arg->default_value = NULL;
     }
 
-    new_arg->provided  = default_value != NULL;
-    new_arg->interface = interface;
+    new_arg->provided                = default_value != NULL;
+    new_arg->interface               = interface;
+    new_arg->condition.is_enabled_fn = NULL;
+    new_arg->condition.parent_arg    = NULL;
+
     if (interface.allow_multiple) {
         if (default_value != NULL) {
             cargs_panic ("Lists do not have a default value");
@@ -257,6 +313,7 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
 
     CARGS__arg_list[CARGS__arg_list_count++] = new_arg;
 
+    assert (new_arg != NULL); // Cannot be null since all previous errors must have been handled.
     return new_arg->interface.value;
 }
 
@@ -291,25 +348,9 @@ CARGS__Argument* CARGS__find_by_name (const char* needle)
     return NULL;
 }
 
-void CARGS__arguments_reset()
-{
-    // Clear provided field for non-optional arguments
-    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* arg = CARGS__arg_list[i];
-        if (arg->default_value == NULL) {
-            arg->provided = false;
-        }
-    }
-}
-
 bool cargs_parse_input (int argc, char** argv)
 {
     CARGS__Argument* the_arg = NULL;
-
-    // Prepare for another parsing of args. Reset few states.
-    if (CARGS__parsing_done_count > 0) {
-        CARGS__arguments_reset();
-    }
 
     CARGS_UNUSED (argc);
     argv++; // Skip first argument
@@ -318,10 +359,7 @@ bool cargs_parse_input (int argc, char** argv)
 
         if (arg[0] == CARGS__ARGUMENT_PREFIX_CHAR) {
             if (!(the_arg = CARGS__find_by_name (arg))) {
-                // This can occur for conditional arguments, when the first pass will sweep across
-                // arguments which is not yet known.
-                // TODO: Handle unknwon argument properly.
-                continue;
+                CARGS_ERROR (false, "ERROR: Unknown argument '%s'", arg);
             }
 
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
@@ -337,14 +375,6 @@ bool cargs_parse_input (int argc, char** argv)
                 }
             }
         } else {
-            if (the_arg == NULL) {
-                // This can occur for conditional arguments, when the first pass will sweep across
-                // arguments which is not yet known.
-
-                // TODO: Handle paramter without an argument
-                continue;
-            }
-
             assert (the_arg != NULL);
 
             if (the_arg->interface.allow_multiple) {
@@ -368,6 +398,10 @@ bool cargs_parse_input (int argc, char** argv)
 
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
+        if (!CARGS__is_arg_condition_enabled (the_arg)) {
+            continue; // Condition is not met for the argument, which means this argument is
+                      // inactive
+        }
         if (!the_arg->provided) {
             CARGS_ERROR (false, "Argument '%s' is required but was not provided", the_arg->name);
         }
@@ -378,18 +412,32 @@ exit:
     return true;
 }
 
+void CARGS__print_nested_args (CARGS__Argument* arg, int indent)
+{
+    fprintf (stderr, "%*s%-*s%-25s%s ", (indent + 1), " ", 15 - indent, arg->name,
+             arg->interface.format_help, arg->description);
+    if (arg->default_value) {
+        fprintf (stderr, "(Default set to '%s')\n", arg->default_value);
+    } else {
+        fprintf (stderr, "(Required)\n");
+    }
+
+    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
+        CARGS__Argument* the_arg = CARGS__arg_list[i];
+        if (the_arg->condition.parent_arg != NULL && the_arg->condition.parent_arg == arg) {
+            CARGS__print_nested_args (the_arg, indent + 2);
+        }
+    }
+}
+
 void cargs_print_help()
 {
     printf ("Usage:\n");
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
+        int indent               = 1;
         CARGS__Argument* the_arg = CARGS__arg_list[i];
-
-        fprintf (stderr, "  %-10s\t%-20s %s ", the_arg->name, the_arg->interface.format_help,
-                 the_arg->description);
-        if (the_arg->default_value) {
-            fprintf (stderr, "(Default set to '%s')\n", the_arg->default_value);
-        } else {
-            fprintf (stderr, "(Required)\n");
+        if (the_arg->condition.parent_arg == NULL) {
+            CARGS__print_nested_args (the_arg, indent);
         }
     }
 }
