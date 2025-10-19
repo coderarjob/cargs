@@ -10,12 +10,6 @@
         cargs_print_help();                    \
     } while (0)
 
-typedef enum {
-    UNSET,
-    ENCRYPT,
-    DECRYPT
-} OpMode;
-
 int main (int argc, char** argv)
 {
     bool* encrypt          = cargs_add_arg ("e", "Encrypt", Boolean, NULL);
