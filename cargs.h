@@ -421,10 +421,17 @@ exit:
     return true;
 }
 
-void CARGS__print_nested_args (CARGS__Argument* arg, int indent)
+void CARGS__print_nested_args (CARGS__Argument* arg, int indent, size_t max_arg_name_len,
+                               size_t max_arg_format_help_len, size_t max_arg_indent_level)
 {
-    fprintf (stderr, "%*s%-*s%-25s%s ", (indent + 1), " ", 15 - indent, arg->name,
-             arg->interface.format_help, arg->description);
+    #define INDENT_INCREMENT_BY 2 // Indent is incremented by 2 characters
+
+    int arg_name_column_width = (max_arg_name_len + (max_arg_indent_level * INDENT_INCREMENT_BY)) -
+                                indent;
+
+    fprintf (stderr, "%*s%-*s %-*s %s ", (indent + 1), " ", arg_name_column_width, arg->name,
+             (int)max_arg_format_help_len, arg->interface.format_help, arg->description);
+
     if (arg->default_value) {
         fprintf (stderr, "(Default set to '%s')\n", arg->default_value);
     } else {
@@ -434,19 +441,48 @@ void CARGS__print_nested_args (CARGS__Argument* arg, int indent)
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
         if (the_arg->condition.parent_arg != NULL && the_arg->condition.parent_arg == arg) {
-            CARGS__print_nested_args (the_arg, indent + 2);
+            CARGS__print_nested_args (the_arg, indent + INDENT_INCREMENT_BY, max_arg_name_len,
+                                      max_arg_format_help_len, max_arg_indent_level);
         }
     }
 }
 
+size_t CARGS__get_nested_level (CARGS__Argument* arg)
+{
+    assert (arg != NULL);
+
+    size_t indent_level = 0;
+    for (; arg != NULL; indent_level++) {
+        arg = arg->condition.parent_arg;
+    }
+    return indent_level;
+}
+
 void cargs_print_help()
 {
+    size_t max_arg_name_len        = 0;
+    size_t max_arg_format_help_len = 0;
+    size_t max_arg_indent_level    = 1;
+
+    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
+        CARGS__Argument* the_arg = CARGS__arg_list[i];
+        max_arg_name_len         = CARGS__MAX (strlen (the_arg->name), max_arg_name_len);
+        max_arg_format_help_len  = CARGS__MAX (strlen (the_arg->interface.format_help),
+                                               max_arg_format_help_len);
+        max_arg_indent_level = CARGS__MAX (CARGS__get_nested_level (the_arg), max_arg_indent_level);
+    }
+
+    assert (max_arg_indent_level >= 1);
+    assert (max_arg_name_len > 0 && max_arg_name_len <= CARGS_MAX_INPUT_VALUE_LEN);
+    assert (max_arg_format_help_len > 0 && max_arg_format_help_len <= CARGS_MAX_INPUT_VALUE_LEN);
+
     printf ("Usage:\n");
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         int indent               = 1;
         CARGS__Argument* the_arg = CARGS__arg_list[i];
         if (the_arg->condition.parent_arg == NULL) {
-            CARGS__print_nested_args (the_arg, indent);
+            CARGS__print_nested_args (the_arg, indent, max_arg_name_len, max_arg_format_help_len,
+                                      max_arg_indent_level);
         }
     }
 }
