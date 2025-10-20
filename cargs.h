@@ -87,7 +87,7 @@ void* cargs_arl_pop (Cargs_ArrayList* arl);
                                .parse_string   = ti.parse_string, \
                            })
 
-#ifdef CARGS_IMPLIMENTATION
+#ifdef CARGS_IMPLEMENTATION
 
 typedef struct CARGS__Argument {
     char* name;
@@ -578,7 +578,7 @@ bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* in
 
     return true;
 }
-#endif // CARGS_IMPLIMENTATION
+#endif // CARGS_IMPLEMENTATION
 
 /*******************************************************************************************
  * Interface types

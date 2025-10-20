@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define CARGS_IMPLIMENTATION
+#define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
 typedef enum {

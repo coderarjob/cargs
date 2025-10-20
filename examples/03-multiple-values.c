@@ -1,6 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
-#define CARGS_IMPLIMENTATION
+#define CARGS_IMPLEMENTATION
 #define CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE '/'
 #include "../cargs.h"
 

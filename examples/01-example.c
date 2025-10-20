@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#define CARGS_IMPLIMENTATION
+#define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
 int main (int argc, char** argv)

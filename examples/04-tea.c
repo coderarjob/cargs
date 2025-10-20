@@ -1,5 +1,5 @@
 #include <stdio.h>
-#define CARGS_IMPLIMENTATION
+#define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
 #define USAGE(p)                                                                         \
