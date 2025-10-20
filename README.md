@@ -16,11 +16,11 @@ Here is an example:
 ```c
 int main (int argc, char** argv)
 {
-    char* output_file = argument_add("O", "Output file path", String, NULL);
-    bool* should_override = argument_add("override", "Override output file", Flag, "false");
+    char* output_file = cargs_add_arg("O", "Output file path", String, NULL);
+    bool* should_override = cargs_add_arg("override", "Override output file", Flag, "false");
 
-    if (!argument_parse (argc, argv)) {
-        print_help();
+    if (!cargs_parse_input (argc, argv)) {
+        cargs_print_help();
         return 1;
     }
 
