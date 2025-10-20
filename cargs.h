@@ -336,6 +336,7 @@ void cargs_cleanup()
         }
         free (arg);
     }
+    CARGS__arg_list_count = 0;
 }
 
 CARGS__Argument* CARGS__find_by_name (const char* needle)
