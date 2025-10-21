@@ -42,6 +42,27 @@ YT_TESTP (cargs, required_arguments_success, bool)
     YT_END();
 }
 
+YT_TEST (cargs, list_type_argument_success)
+{
+    char* argv[] = { "dummy", "-A", "abc", "-B", "1", "2", "3", "-C", "true", NULL };
+    int argc     = sizeof (argv) / sizeof (argv[0]);
+
+    char* a            = cargs_add_arg ("A", "1st arg", String, NULL);
+    Cargs_ArrayList* b = cargs_add_arg ("B", "2nd arg", CARGS_LISTOF (Integer), NULL);
+    char* c            = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
+
+    YT_EQ_SCALAR (true, cargs_parse_input (argc, argv));
+
+    YT_EQ_STRING (a, "abc");
+    YT_EQ_SCALAR (*c, true);
+    YT_EQ_SCALAR (b->len, 3U);
+    YT_EQ_SCALAR (((int*)b->buffer)[0], 1);
+    YT_EQ_SCALAR (((int*)b->buffer)[1], 2);
+    YT_EQ_SCALAR (((int*)b->buffer)[2], 3);
+
+    YT_END();
+}
+
 YT_TEST (cargs, argument_value_length_clamping)
 {
     char* argv[] = { "dummy", "-A", "123456789ABCD", NULL };
@@ -57,13 +78,11 @@ YT_TEST (cargs, argument_value_length_clamping)
 
 YT_TEST (cargs, required_arguments_not_met)
 {
-    char* argv[] = { "dummy", "-A", "abc", "-C", "true", "-D", "12.84", NULL };
+    char* argv[] = { "dummy", "-A", "abc", NULL };
     int argc     = sizeof (argv) / sizeof (argv[0]);
 
     cargs_add_arg ("A", "1st arg", String, NULL);
     cargs_add_arg ("B", "2nd arg", Integer, NULL);
-    cargs_add_arg ("C", "3rd arg", Boolean, NULL);
-    cargs_add_arg ("D", "4th arg", Double, NULL);
 
     YT_EQ_SCALAR (false, cargs_parse_input (argc, argv));
 
@@ -144,5 +163,6 @@ int main (void)
     default_value_override();
     help_argument_present();
     argument_value_length_clamping();
+    list_type_argument_success();
     YT_RETURN_WITH_REPORT();
 }
