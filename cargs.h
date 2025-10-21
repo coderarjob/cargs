@@ -561,7 +561,19 @@ bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* in
     assert (self->value != NULL);
     CARGS_UNUSED (self);
 
-    strncpy ((char*)out.address, input, CARGS__MIN (CARGS_MAX_INPUT_VALUE_LEN, out.len));
+    assert (out.len - 1 <= CARGS_MAX_INPUT_VALUE_LEN);
+
+    // Copies at most CARGS_MAX_INPUT_VALUE_LEN number of non-null characters.
+    char* last = stpncpy ((char*)out.address, input, CARGS_MAX_INPUT_VALUE_LEN);
+
+    // If input has more than CARGS_MAX_INPUT_VALUE_LEN chars, then stpncpy copies that many chars
+    // to the destination but does not add null termination byte. This is why the below line is
+    // important.
+    *last = '\0';
+
+    // Assert: Last character does not exceed the allocated/out buffer length.
+    assert (((uintptr_t)last - (uintptr_t)out.address + 1) <= out.len);
+
     return true;
 }
 
@@ -626,9 +638,11 @@ Cargs_TypeInterface Integer = {
 };
 
 Cargs_TypeInterface String = {
-    .name         = "string",
-    .format_help  = "(text)",
-    .type_size    = sizeof (char) * CARGS_MAX_INPUT_VALUE_LEN,
+    .name        = "string",
+    .format_help = "(text)",
+    .type_size   = sizeof (char) * CARGS_MAX_INPUT_VALUE_LEN + 1, // +1 for the NULL byte which the
+                                                                  // CARGS_MAX_INPUT_VALUE_LEN does
+                                                                  // not include
     .parse_string = cargs_string_parse_string,
 };
 
