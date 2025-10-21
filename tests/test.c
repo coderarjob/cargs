@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #define YUKTI_TEST_IMPLEMENTATION
 #include "yukti.h"
 
@@ -5,15 +6,31 @@
 #define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
-YT_TEST (cargs, required_arguments_success)
+static bool always_true()
 {
+    return true;
+}
+
+YT_TESTP (cargs, required_arguments_success, bool)
+{
+    bool should_test_subargs = YT_ARG_0();
     char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-C", "true", "-D", "12.84", NULL };
     int argc     = sizeof (argv) / sizeof (argv[0]);
 
-    char* a   = cargs_add_arg ("A", "1st arg", String, NULL);
-    int* b    = cargs_add_arg ("B", "2nd arg", Integer, NULL);
-    bool* c   = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
-    double* d = cargs_add_arg ("D", "4th arg", Double, NULL);
+    int* b    = NULL;
+    bool* c   = NULL;
+    double* d = NULL;
+
+    char* a = cargs_add_arg ("A", "1st arg", String, NULL);
+    if (!should_test_subargs) {
+        b = cargs_add_arg ("B", "2nd arg", Integer, NULL);
+        c = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
+        d = cargs_add_arg ("D", "4th arg", Double, NULL);
+    } else {
+        b = cargs_add_subarg (a, always_true, "B", "2nd arg", Integer, NULL);
+        c = cargs_add_subarg (a, always_true, "C", "3rd arg", Boolean, NULL);
+        d = cargs_add_subarg (a, always_true, "D", "4th arg", Double, NULL);
+    }
 
     YT_EQ_SCALAR (true, cargs_parse_input (argc, argv));
 
@@ -121,7 +138,7 @@ void yt_reset (void)
 int main (void)
 {
     YT_INIT();
-    required_arguments_success();
+    required_arguments_success (2, YT_ARG (bool){ true, false });
     required_arguments_not_met();
     default_values();
     default_value_override();
