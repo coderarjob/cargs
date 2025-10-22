@@ -3,6 +3,8 @@
 #include "yukti.h"
 
 #define CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE 10 // A small enough number for easy testing
+#define CARGS_MAX_NAME_LEN_OVERRIDE        CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE
+#define CARGS_MAX_DESCRIPTION_LEN_OVERRIDE CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE
 #define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
@@ -63,7 +65,7 @@ YT_TEST (cargs, list_type_argument_success)
     YT_END();
 }
 
-YT_TEST (cargs, argument_value_length_clamping)
+YT_TEST (cargs, arg_value_length_clamping)
 {
     char* argv[] = { "dummy", "-A", "123456789ABCD", NULL };
     int argc     = sizeof (argv) / sizeof (argv[0]);
@@ -73,6 +75,20 @@ YT_TEST (cargs, argument_value_length_clamping)
 
     // CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE number of non-null characters
     YT_EQ_STRING (a, "123456789A");
+    YT_END();
+}
+
+YT_TEST (cargs, arg_name_length_clamping)
+{
+    char* a = cargs_add_arg ("A23456789", "1st arg", String, NULL);
+
+    // Argument name is clamped to CARGS__MAX_NAME_LEN_OVERRIDE number of non-null characters
+    char* argv[] = { "dummy", "-A23456789BCD", "123", NULL };
+    int argc     = sizeof (argv) / sizeof (argv[0]);
+
+    YT_EQ_SCALAR (true, cargs_parse_input (argc, argv));
+    YT_EQ_STRING (a, "123");
+
     YT_END();
 }
 
@@ -148,6 +164,17 @@ YT_TEST (cargs, default_value_override)
 
     YT_END();
 }
+YT_TEST (cargs, unknown_argument_in_cl)
+{
+    char* argv[] = { "dummy", "-B", "23", NULL };
+    int argc     = sizeof (argv) / sizeof (argv[0]);
+
+    cargs_add_arg ("A", "1st arg", String, NULL);
+
+    YT_EQ_SCALAR (false, cargs_parse_input (argc, argv));
+
+    YT_END();
+}
 
 void yt_reset (void)
 {
@@ -162,7 +189,9 @@ int main (void)
     default_values();
     default_value_override();
     help_argument_present();
-    argument_value_length_clamping();
+    arg_value_length_clamping();
     list_type_argument_success();
+    unknown_argument_in_cl();
+    arg_name_length_clamping();
     YT_RETURN_WITH_REPORT();
 }
