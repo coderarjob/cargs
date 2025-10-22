@@ -35,8 +35,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CARGS__MAX_NAME_LEN        50  // null byte is not included
-#define CARGS__MAX_DESCRIPTION_LEN 100 // null byte is not included
+#ifdef CARGS_MAX_NAME_LEN_OVERRIDE // null byte is not included
+    #define CARGS__MAX_NAME_LEN CARGS_MAX_NAME_LEN_OVERRIDE
+#else
+    #define CARGS__MAX_NAME_LEN 50 // null byte is not included
+#endif                             // CARGS_MAX_NAME_LEN_OVERRIDE
+
+#ifdef CARGS_MAX_DESCRIPTION_LEN_OVERRIDE // null byte is not included
+    #define CARGS__MAX_DESCRIPTION_LEN CARGS_MAX_DESCRIPTION_LEN_OVERRIDE
+#else
+    #define CARGS__MAX_DESCRIPTION_LEN 100 // null byte is not included
+#endif                                     // CARGS_MAX_DESCRIPTION_LEN_OVERRIDE
 
 #ifdef CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE // null byte is not included
     #define CARGS_MAX_INPUT_VALUE_LEN CARGS_MAX_INPUT_VALUE_LEN_OVERRIDE
