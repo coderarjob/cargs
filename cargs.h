@@ -93,11 +93,24 @@ typedef struct {
     } while (0)
 
 void cargs_panic (const char* msg);
-void* cargs_add_subarg (void* parent_arg_value_addr, bool (*is_enabled_fn) (void), const char* name,
-                        const char* description, Cargs_TypeInterface interface,
-                        const char* default_value);
-void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterface interface,
-                     const char* default_value);
+
+void* CARGS__cargs_add_arg (const char* name, const char* description,
+                            Cargs_TypeInterface interface, const char* default_value,
+                            bool (*is_enabled_fn) (void));
+
+static inline void* cargs_add_arg (const char* name, const char* description,
+                                   Cargs_TypeInterface interface, const char* default_value)
+{
+    return CARGS__cargs_add_arg (name, description, interface, default_value, NULL);
+}
+
+static inline void* cargs_add_cond_arg (bool (*is_enabled_fn) (void), const char* name,
+                                        const char* description, Cargs_TypeInterface interface,
+                                        const char* default_value)
+{
+    return CARGS__cargs_add_arg (name, description, interface, default_value, is_enabled_fn);
+}
+
 void cargs_cleanup();
 bool cargs_parse_input (int argc, char** argv);
 void cargs_print_help();
@@ -259,30 +272,9 @@ bool CARGS__is_arg_enabled (CARGS__Argument* arg)
     return true;
 }
 
-void* cargs_add_subarg (void* parent_arg_value_addr, bool (*is_enabled_fn) (void), const char* name,
-                        const char* description, Cargs_TypeInterface interface,
-                        const char* default_value)
-{
-    CARGS__Argument* parent_arg = CARGS__find_by_value_address (parent_arg_value_addr);
-    assert (parent_arg != NULL);
-
-    if (parent_arg->interface.allow_multiple && is_enabled_fn != NULL) {
-        cargs_panic ("Sub command of List argument are automatically enabled/disabled.");
-    }
-
-    void* new_arg_value_addr = cargs_add_arg (name, description, interface, default_value);
-    assert (new_arg_value_addr != NULL);
-
-    CARGS__Argument* new_arg = CARGS__find_by_value_address (new_arg_value_addr);
-    assert (new_arg != NULL);
-
-    new_arg->is_enabled_fn = is_enabled_fn;
-
-    return new_arg_value_addr;
-}
-
-void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterface interface,
-                     const char* default_value)
+void* CARGS__cargs_add_arg (const char* name, const char* description,
+                            Cargs_TypeInterface interface, const char* default_value,
+                            bool (*is_enabled_fn) (void))
 {
     CARGS__Argument* new_arg = NULL;
 
@@ -321,7 +313,7 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
     new_arg->dirty    = false; // Initially args are not dirty. Becomes dirty if was modified later.
     new_arg->provided = default_value != NULL;
     new_arg->interface     = interface;
-    new_arg->is_enabled_fn = NULL;
+    new_arg->is_enabled_fn = is_enabled_fn;
 
     if (interface.allow_multiple) {
         if (default_value != NULL) {

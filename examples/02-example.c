@@ -60,8 +60,8 @@ int main (int argc, char** argv)
 {
     config.do_encrypt = cargs_add_arg ("mode", "Mode of wave generation", ModesInterface, NULL);
     config.show_help  = cargs_add_arg ("h", "Show usage", Help, "false");
-    config.freq       = cargs_add_subarg (config.do_encrypt, freq_is_enabled, "freq",
-                                          "Sine/AM wave frequency", Double, NULL);
+    config.freq = cargs_add_cond_arg (freq_is_enabled, "freq", "Sine/AM wave frequency", Double,
+                                      NULL);
 
     if (!cargs_parse_input (argc, argv)) {
         cargs_print_help();
