@@ -21,36 +21,35 @@ static bool always_false()
     return false;
 }
 
-YT_TESTP (cargs, required_arguments, bool, bool)
+YT_TEST (cargs, non_list_arguments_parsing)
 {
-    bool test_subargs      = YT_ARG_0();
-    bool all_args_provided = YT_ARG_1();
+    char* a   = cargs_add_arg ("A", "1st arg", String, NULL);
+    int* b    = cargs_add_arg ("B", "2nd arg", Integer, NULL);
+    bool* c   = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
+    double* d = cargs_add_arg ("D", "4th arg", Double, NULL);
 
-    int* b    = NULL;
-    bool* c   = NULL;
-    double* d = NULL;
+    char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-C", "true", "-D", "12.84", NULL };
+    YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
 
-    char* a = cargs_add_arg ("A", "1st arg", String, NULL);
-    if (!test_subargs) {
-        b = cargs_add_arg ("B", "2nd arg", Integer, NULL);
-        c = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
-        d = cargs_add_arg ("D", "4th arg", Double, NULL);
-    } else {
-        b = cargs_add_subarg (a, always_true, "B", "2nd arg", Integer, NULL);
-        c = cargs_add_subarg (a, always_true, "C", "3rd arg", Boolean, NULL);
-        d = cargs_add_subarg (a, always_true, "D", "4th arg", Double, NULL);
-    }
+    YT_EQ_STRING (a, "abc");
+    YT_EQ_SCALAR (*b, 1);
+    YT_EQ_SCALAR (*c, true);
+    YT_EQ_DOUBLE_REL (*d, 12.84, 0.001);
 
-    if (all_args_provided) {
-        char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-C", "true", "-D", "12.84", NULL };
+    YT_END();
+}
+
+YT_TESTP (cargs, required_arguments, bool)
+{
+    bool is_required_args_provided = YT_ARG_0();
+
+    cargs_add_arg ("A", "1st arg", String, NULL);
+
+    if (is_required_args_provided) {
+        char* argv[] = { "dummy", "-A", "abc", NULL };
         YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
-
-        YT_EQ_STRING (a, "abc");
-        YT_EQ_SCALAR (*b, 1);
-        YT_EQ_SCALAR (*c, true);
-        YT_EQ_DOUBLE_REL (*d, 12.84, 0.001);
     } else {
-        char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-D", "12.84", NULL };
+        char* argv[] = { "dummy", NULL };
         YT_EQ_SCALAR (false, cargs_parse_input (ARRAY_LEN (argv), argv));
     }
 
@@ -171,17 +170,13 @@ YT_TEST (cargs, unknown_argument_in_cl)
 YT_TESTP (cargs, inactive_argument_in_cl, bool)
 {
     bool is_inactive_arg_present_in_cl = YT_ARG_0();
-
-    // "A" argument is only created to be used in the creation of the subarg, nothing else.
-    // Note: Flag interface is used to keep test simpler.
-    bool* a = cargs_add_arg ("A", "1st arg", Flag, "false");           // Default can also be true.
-    cargs_add_subarg (a, always_false, "B", "2nd arg", Flag, "false"); // Default can also be true.
+    char* argv[]                       = { "dummy", "-A", NULL };
 
     if (is_inactive_arg_present_in_cl) {
-        char* argv[] = { "dummy", "-B", NULL };
+        cargs_add_cond_arg (always_false, "A", "1st arg", Flag, "false");
         YT_EQ_SCALAR (false, cargs_parse_input (ARRAY_LEN (argv), argv));
     } else {
-        char* argv[] = { "dummy", NULL };
+        cargs_add_cond_arg (always_true, "A", "1st arg", Flag, "false");
         YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
     }
 
@@ -196,10 +191,8 @@ void yt_reset (void)
 int main (void)
 {
     YT_INIT();
-    // clang-format off
-    required_arguments (4, YT_ARG (bool){ true, true, false, false },
-                           YT_ARG (bool){ true, false, true, false });
-    // clang-format on
+    non_list_arguments_parsing();
+    required_arguments (2, YT_ARG (bool){ true, false });
     default_values();
     default_value_override();
     help_argument_present();
