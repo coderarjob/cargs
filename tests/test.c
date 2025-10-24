@@ -8,8 +8,97 @@
 #define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
+/**************************************************************************************************
+ * Requirements:
+ * cargs_parse_input
+ *  - [REQ: 2 ] A conditional arg is active if the predicate function returns true.
+ *  - [REQ: 4 ] Arguments must have CARGS__ARGUMENT_PREFIX_CHAR as the first char.
+ *  - [REQ: 5 ] Fail if no value is provided for active, non-optional args.
+ *  - [REQ: 6 ] Fail if value is provided for non-active args.
+ *  - [REQ: 7 ] Fail if value is provided for unknown arg.
+ *  - [REQ: 8 ] Help arg should stop further arg parsing and pass.
+ *  - [REQ: 9 ] For non list args, provided value is parsed as per Interface type.
+ *  - [REQ: 13] For list args, all provided values are parsed as per Interface type.
+ * cargs_add_arg
+ *  - [REQ: 10] For list arg, multiple values of any number can be accessed by the pointer.
+ *  - [REQ: 11] For non-list arg, value can be accessed by the pointer.
+ *  - [REQ: 14] A non-list arg with a provided default value is treated as optional.
+ *  - [REQ: 15] For optional args, the default value is accessed by the pointer if no arg was given.
+ * General
+ *  - [REQ: 12] All string inputs must have some cap on its length when accessing.
+ *
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | FUT               | Requirement/Test case                        | Test function name        |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_add_arg,    | * [REQ: 11], [REQ: 9], [REQ: 4]              |non_list_arguments_parsing |
+ * | cargs_parse_input |                                              |                           |
+ * |                   | Argument values of were provided in cmd line |                           |
+ * |                   | Parsing should pass and results match with   |                           |
+ * |                   | input.                                       |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_parse_input | * [REQ: 5]                                   |required_arguments         |
+ * |                   |                                              |                           |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | Required arguments where provided.           | Test# 1                   |
+ * |                   | Parsing should pass.                         |                           |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | Required arguments where not provided.       | Test# 2                   |
+ * |                   | Parsing should fail.                         |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_parse_input | * [REQ: 8]                                   |help_argument_present      |
+ * |                   |                                              |                           |
+ * |                   | Help argument is provided when a required    |                           |
+ * |                   | arg was not provided. Parsing should pass.   |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_add_arg,    | * [REQ: 10], [REQ: 13]                       |list_type_argument_success |
+ * | CARGS_LISTOF      |                                              |                           |
+ * | cargs_parse_input |                                              |                           |
+ * |                   |                                              |                           |
+ * |                   | Multiple values were passed for each argument|                           |
+ * |                   | Parsing should pass.                         |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_parse_input | * [REQ: 12]                                  |arg_value_length_clamping  |
+ * |                   |                                              |                           |
+ * |                   | Argument value in command line has excess    |                           |
+ * |                   | characters. Parsing should pass.             |                           |
+ * |                   | Parsing should pass.                         |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_parse_input | * [REQ: 12]                                  |arg_name_length_clamping   |
+ * |                   |                                              |                           |
+ * |                   | Argument name in command line has excess     |                           |
+ * |                   | characters. Parsing should pass.             |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_add_arg,    | * [REQ: 5], [REQ: 14], [REQ: 15]             |default_values             |
+ * | cargs_parse_input |                                              |                           |
+ * |                   |                                              |                           |
+ * |                   | Default values for arguments where provided  |                           |
+ * |                   | and none provided in command line.           |                           |
+ * |                   | Parsing should pass.                         |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_add_arg,    | * [REQ: 5], [REQ: 15], [REQ: 9]              |default_values_override    |
+ * | cargs_parse_input |                                              |                           |
+ * |                   |                                              |                           |
+ * |                   | Default values for arguments where provided  |                           |
+ * |                   | and were also provided in command line.      |                           |
+ * |                   | Parsing should pass.                         |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_parse_input | * [REQ: 7]                                   |unknown_argument_in_cl     |
+ * |                   |                                              |                           |
+ * |                   | Unknown argument found at the time of parsing|                           |
+ * |                   | command line.                                |                           |
+ * |                   | Parsing should fail.                         |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_parse_input | * [REQ: 2], [REQ: 6]                         |inactive_argument_in_cl    |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | Known argument provided for inactive arg     | Test# 1                   |
+ * |                   | Parsing should fail.                         |                           |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | Known argument provided for active arg       | Test# 2                   |
+ * |                   | Parsing should pass.                         |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ **************************************************************************************************/
 
-#define ARRAY_LEN(a) (sizeof(a)/sizeof(a[0]))
+#define ARRAY_LEN(a) (sizeof (a) / sizeof (a[0]))
 
 static bool always_true()
 {
