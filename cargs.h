@@ -35,6 +35,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef CARGS_MAX_ARG_COUNT_OVERRIDE // This many arguments are allowed
+    #define CARGS__MAX_ARG_COUNT CARGS_MAX_ARG_COUNT_OVERRIDE
+#else
+    #define CARGS__MAX_ARG_COUNT 20 // This many arguments are allowed
+#endif                              // CARGS_MAX_ARG_COUNT_OVERRIDE
+
 #ifdef CARGS_MAX_NAME_LEN_OVERRIDE // null byte is not included
     #define CARGS__MAX_NAME_LEN CARGS_MAX_NAME_LEN_OVERRIDE
 #else
@@ -149,7 +155,7 @@ typedef struct CARGS__Argument {
 } CARGS__Argument;
 
 unsigned int CARGS__arg_list_count = 0;
-CARGS__Argument* CARGS__arg_list[10];
+CARGS__Argument* CARGS__arg_list[CARGS__MAX_ARG_COUNT];
 
 void cargs_panic (const char* msg)
 {
@@ -167,6 +173,8 @@ void cargs_panic (const char* msg)
         {                              \
             .address = (a), .len = (l) \
         }
+
+    #define CARGS__ARRAY_LEN(a) (sizeof (a) / sizeof (a[0]))
 
 /*******************************************************************************************
  * ArrayList functions
@@ -278,7 +286,7 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
 {
     CARGS__Argument* new_arg = NULL;
 
-    if (CARGS__arg_list_count >= 10) {
+    if (CARGS__arg_list_count >= CARGS__ARRAY_LEN (CARGS__arg_list)) {
         cargs_panic ("Too many arguments added");
     }
 
