@@ -16,23 +16,22 @@ static bool always_true()
     return true;
 }
 
-YT_TESTP (cargs, required_arguments_success, bool)
 static bool always_false()
 {
     return false;
 }
 
+YT_TESTP (cargs, required_arguments, bool, bool)
 {
-    bool should_test_subargs = YT_ARG_0();
-    char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-C", "true", "-D", "12.84", NULL };
-    int argc     = sizeof (argv) / sizeof (argv[0]);
+    bool test_subargs      = YT_ARG_0();
+    bool all_args_provided = YT_ARG_1();
 
     int* b    = NULL;
     bool* c   = NULL;
     double* d = NULL;
 
     char* a = cargs_add_arg ("A", "1st arg", String, NULL);
-    if (!should_test_subargs) {
+    if (!test_subargs) {
         b = cargs_add_arg ("B", "2nd arg", Integer, NULL);
         c = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
         d = cargs_add_arg ("D", "4th arg", Double, NULL);
@@ -42,12 +41,18 @@ static bool always_false()
         d = cargs_add_subarg (a, always_true, "D", "4th arg", Double, NULL);
     }
 
-    YT_EQ_SCALAR (true, cargs_parse_input (argc, argv));
+    if (all_args_provided) {
+        char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-C", "true", "-D", "12.84", NULL };
+        YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
 
-    YT_EQ_STRING (a, "abc");
-    YT_EQ_SCALAR (*b, 1);
-    YT_EQ_SCALAR (*c, true);
-    YT_EQ_DOUBLE_REL (*d, 12.84, 0.001);
+        YT_EQ_STRING (a, "abc");
+        YT_EQ_SCALAR (*b, 1);
+        YT_EQ_SCALAR (*c, true);
+        YT_EQ_DOUBLE_REL (*d, 12.84, 0.001);
+    } else {
+        char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-D", "12.84", NULL };
+        YT_EQ_SCALAR (false, cargs_parse_input (ARRAY_LEN (argv), argv));
+    }
 
     YT_END();
 }
@@ -100,24 +105,11 @@ YT_TEST (cargs, arg_name_length_clamping)
     YT_END();
 }
 
-YT_TEST (cargs, required_arguments_not_met)
-{
-    char* argv[] = { "dummy", "-A", "abc", NULL };
-    int argc     = sizeof (argv) / sizeof (argv[0]);
-
-    cargs_add_arg ("A", "1st arg", String, NULL);
-    cargs_add_arg ("B", "2nd arg", Integer, NULL);
-
-    YT_EQ_SCALAR (false, cargs_parse_input (argc, argv));
-
-    YT_END();
-}
-
 YT_TEST (cargs, help_argument_present)
 {
     // When help flag is found during parsing, the check to see if all required arguments were
-    // provided is not done, thus this test is same as `required_arguments_not_met` but with one
-    // additional Help arg and as a result cargs_parse_input would pass this time.
+    // provided is not done, thus this test has one required argument missing in the command line
+    // but has one Help arg and as a result cargs_parse_input would pass this time.
 
     char* argv[] = { "dummy", "-A", "abc", "-C", "true", "-D", "12.84", "-H", NULL };
     int argc     = sizeof (argv) / sizeof (argv[0]);
@@ -208,8 +200,10 @@ void yt_reset (void)
 int main (void)
 {
     YT_INIT();
-    required_arguments_success (2, YT_ARG (bool){ true, false });
-    required_arguments_not_met();
+    // clang-format off
+    required_arguments (4, YT_ARG (bool){ true, true, false, false },
+                           YT_ARG (bool){ true, false, true, false });
+    // clang-format on
     default_values();
     default_value_override();
     help_argument_present();
