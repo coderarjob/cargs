@@ -131,14 +131,11 @@ typedef struct CARGS__Argument {
     bool provided; // true if some value was provided. Always true for optional arguments.
     bool dirty;    // true mean value was updated during parsing.
     Cargs_TypeInterface interface;
-    struct {
-        struct CARGS__Argument* parent_arg;
-        bool (*is_enabled_fn) (void);
-    } condition;
+    bool (*is_enabled_fn) (void); // If NULL, arg is always enabled, otherwise its enabled when this
+                                  // predicate returns true.
 } CARGS__Argument;
 
-unsigned int CARGS__parsing_done_count = 0;
-unsigned int CARGS__arg_list_count     = 0;
+unsigned int CARGS__arg_list_count = 0;
 CARGS__Argument* CARGS__arg_list[10];
 
 void cargs_panic (const char* msg)
@@ -254,15 +251,10 @@ CARGS__Argument* CARGS__find_by_value_address (const void* needle)
     return NULL;
 }
 
-bool CARGS__is_arg_condition_enabled (CARGS__Argument* arg)
+bool CARGS__is_arg_enabled (CARGS__Argument* arg)
 {
-    if (arg->condition.parent_arg != NULL) {
-        CARGS__Argument* parent_arg = arg->condition.parent_arg;
-        if (parent_arg->interface.allow_multiple) {
-            return ((Cargs_ArrayList*)parent_arg->interface.value)->len > 0;
-        } else {
-            return arg->condition.is_enabled_fn();
-        }
+    if (arg->is_enabled_fn != NULL) {
+        return arg->is_enabled_fn();
     }
     return true;
 }
@@ -284,8 +276,7 @@ void* cargs_add_subarg (void* parent_arg_value_addr, bool (*is_enabled_fn) (void
     CARGS__Argument* new_arg = CARGS__find_by_value_address (new_arg_value_addr);
     assert (new_arg != NULL);
 
-    new_arg->condition.is_enabled_fn = is_enabled_fn;
-    new_arg->condition.parent_arg    = parent_arg;
+    new_arg->is_enabled_fn = is_enabled_fn;
 
     return new_arg_value_addr;
 }
@@ -329,9 +320,8 @@ void* cargs_add_arg (const char* name, const char* description, Cargs_TypeInterf
 
     new_arg->dirty    = false; // Initially args are not dirty. Becomes dirty if was modified later.
     new_arg->provided = default_value != NULL;
-    new_arg->interface               = interface;
-    new_arg->condition.is_enabled_fn = NULL;
-    new_arg->condition.parent_arg    = NULL;
+    new_arg->interface     = interface;
+    new_arg->is_enabled_fn = NULL;
 
     if (interface.allow_multiple) {
         if (default_value != NULL) {
@@ -438,7 +428,7 @@ bool cargs_parse_input (int argc, char** argv)
 
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
-        if (CARGS__is_arg_condition_enabled (the_arg)) {
+        if (CARGS__is_arg_enabled (the_arg)) {
             // Argument is enabled but not provided.
             if (!the_arg->provided) {
                 CARGS_ERROR (false, "Argument '%s' is required but was not provided",
@@ -453,19 +443,13 @@ bool cargs_parse_input (int argc, char** argv)
     }
 
 exit:
-    CARGS__parsing_done_count++; // Increment the number of times this parsing of argv was done.
     return true;
 }
 
-void CARGS__print_nested_args (CARGS__Argument* arg, int indent, size_t max_arg_name_len,
-                               size_t max_arg_format_help_len, size_t max_arg_indent_level)
+static void CARGS__print_help_message (CARGS__Argument* arg, size_t max_arg_name_len,
+                                       size_t max_arg_format_help_len)
 {
-    #define INDENT_INCREMENT_BY 2 // Indent is incremented by 2 characters
-
-    int arg_name_column_width = (max_arg_name_len + (max_arg_indent_level * INDENT_INCREMENT_BY)) -
-                                indent;
-
-    fprintf (stderr, "%*s%-*s %-*s %s ", (indent + 1), " ", arg_name_column_width, arg->name,
+    fprintf (stderr, "%-*s %-*s %s ", (int)max_arg_name_len, arg->name,
              (int)max_arg_format_help_len, arg->interface.format_help, arg->description);
 
     if (arg->default_value) {
@@ -473,52 +457,44 @@ void CARGS__print_nested_args (CARGS__Argument* arg, int indent, size_t max_arg_
     } else {
         fprintf (stderr, "(Required)\n");
     }
-
-    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* the_arg = CARGS__arg_list[i];
-        if (the_arg->condition.parent_arg != NULL && the_arg->condition.parent_arg == arg) {
-            CARGS__print_nested_args (the_arg, indent + INDENT_INCREMENT_BY, max_arg_name_len,
-                                      max_arg_format_help_len, max_arg_indent_level);
-        }
-    }
-}
-
-size_t CARGS__get_nested_level (CARGS__Argument* arg)
-{
-    assert (arg != NULL);
-
-    size_t indent_level = 0;
-    for (; arg != NULL; indent_level++) {
-        arg = arg->condition.parent_arg;
-    }
-    return indent_level;
 }
 
 void cargs_print_help()
 {
     size_t max_arg_name_len        = 0;
     size_t max_arg_format_help_len = 0;
-    size_t max_arg_indent_level    = 1;
 
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
         max_arg_name_len         = CARGS__MAX (strlen (the_arg->name), max_arg_name_len);
         max_arg_format_help_len  = CARGS__MAX (strlen (the_arg->interface.format_help),
                                                max_arg_format_help_len);
-        max_arg_indent_level = CARGS__MAX (CARGS__get_nested_level (the_arg), max_arg_indent_level);
     }
 
-    assert (max_arg_indent_level >= 1);
     assert (max_arg_name_len > 0 && max_arg_name_len <= CARGS_MAX_INPUT_VALUE_LEN);
     assert (max_arg_format_help_len > 0 && max_arg_format_help_len <= CARGS_MAX_INPUT_VALUE_LEN);
 
-    printf ("Usage:\n");
+    size_t conditional_arg_count = 0;
+
+    fprintf (stderr, "Usage:\n");
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        int indent               = 1;
         CARGS__Argument* the_arg = CARGS__arg_list[i];
-        if (the_arg->condition.parent_arg == NULL) {
-            CARGS__print_nested_args (the_arg, indent, max_arg_name_len, max_arg_format_help_len,
-                                      max_arg_indent_level);
+        if (the_arg->is_enabled_fn == NULL) {
+            CARGS__print_help_message (the_arg, max_arg_name_len, max_arg_format_help_len);
+        } else {
+            conditional_arg_count++;
+        }
+    }
+
+    if (conditional_arg_count == 0) {
+        return; // No conditional arguments
+    }
+
+    fprintf (stderr, "Conditional:\n");
+    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
+        CARGS__Argument* the_arg = CARGS__arg_list[i];
+        if (the_arg->is_enabled_fn != NULL) {
+            CARGS__print_help_message (the_arg, max_arg_name_len, max_arg_format_help_len);
         }
     }
 }
