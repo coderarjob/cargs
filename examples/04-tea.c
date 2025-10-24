@@ -87,9 +87,10 @@ int main (int argc, char** argv)
         printf ("Decrypt and display: %d\n", *config.output_to_stdout);
     }
     printf ("Number of input files: %ld\n", config.infiles->len);
-    for (char* file = cargs_arl_pop (config.infiles); file != NULL;
-         file       = cargs_arl_pop (config.infiles)) {
-        printf ("* %s\n", file);
+    typedef char Buffer[CARGS_MAX_INPUT_VALUE_LEN + 1];
+
+    for (unsigned i = 0; i < config.infiles->len; i++) {
+        printf ("* %s\n", ((Buffer*)config.infiles->buffer)[i]);
     }
 
     cargs_cleanup();
