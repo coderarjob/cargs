@@ -8,12 +8,20 @@
 #define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
+
+#define ARRAY_LEN(a) (sizeof(a)/sizeof(a[0]))
+
 static bool always_true()
 {
     return true;
 }
 
 YT_TESTP (cargs, required_arguments_success, bool)
+static bool always_false()
+{
+    return false;
+}
+
 {
     bool should_test_subargs = YT_ARG_0();
     char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-C", "true", "-D", "12.84", NULL };
@@ -172,6 +180,22 @@ YT_TEST (cargs, unknown_argument_in_cl)
     cargs_add_arg ("A", "1st arg", String, NULL);
 
     YT_EQ_SCALAR (false, cargs_parse_input (argc, argv));
+YT_TESTP (cargs, inactive_argument_in_cl, bool)
+{
+    bool is_inactive_arg_present_in_cl = YT_ARG_0();
+
+    // "A" argument is only created to be used in the creation of the subarg, nothing else.
+    // Note: Flag interface is used to keep test simpler.
+    bool* a = cargs_add_arg ("A", "1st arg", Flag, "false");           // Default can also be true.
+    cargs_add_subarg (a, always_false, "B", "2nd arg", Flag, "false"); // Default can also be true.
+
+    if (is_inactive_arg_present_in_cl) {
+        char* argv[] = { "dummy", "-B", NULL };
+        YT_EQ_SCALAR (false, cargs_parse_input (ARRAY_LEN(argv), argv));
+    } else {
+        char* argv[] = { "dummy", NULL };
+        YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN(argv), argv));
+    }
 
     YT_END();
 }
@@ -193,5 +217,6 @@ int main (void)
     list_type_argument_success();
     unknown_argument_in_cl();
     arg_name_length_clamping();
+    inactive_argument_in_cl (2, YT_ARG (bool){ true, false });
     YT_RETURN_WITH_REPORT();
 }
