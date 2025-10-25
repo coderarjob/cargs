@@ -414,18 +414,19 @@ bool cargs_parse_input (int argc, char** argv)
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
             // value to the flag argument) now when it is first detected.
             if (the_arg->interface.is_flag) {
-                // Special case for Help. If a help flag is found we skip the rest of the
-                // parsing and simply return.
-                if (strcmp ("help", the_arg->interface.name) == 0) {
-                    goto exit;
-                }
-
                 the_arg->provided = the_arg->interface.parse_string (
                     &the_arg->interface, arg,
                     CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size));
 
                 assert (the_arg->provided); // Parsing of flags cannot fail, because it takes no
                                             // value.
+
+                // Special case for Help. If a help flag is found we skip the rest of the
+                // parsing and simply return.
+                if (strcmp ("help", the_arg->interface.name) == 0) {
+                    goto exit;
+                }
+
             }
         } else {
             assert (the_arg != NULL);
@@ -530,10 +531,10 @@ void cargs_print_help()
         return; // No conditional arguments
     }
 
-    fprintf (stderr, "Conditional:");
+    fprintf (stderr, "\nConditional ");
     #ifndef CARGS_DISABLE_COLORS
-    fprintf (stderr, " %sAvailable%s | %sDisabled%s arguments:%s", CARGS__COL_ENABLED_ARG,
-             CARGS__COL_NOTE, CARGS__COL_DISABLED_ARG, CARGS__COL_NOTE, CARGS__COL_RESET);
+    fprintf (stderr, "(shows %sAvailable%s & %sDisabled%s) arguments:", CARGS__COL_ENABLED_ARG,
+             CARGS__COL_NOTE, CARGS__COL_DISABLED_ARG, CARGS__COL_RESET);
     #endif // CARGS_DISABLE_COLORS
     fprintf (stderr, "\n");
 

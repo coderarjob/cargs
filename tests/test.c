@@ -47,7 +47,7 @@
  * |                   | Required arguments where not provided.       | Test# 2                   |
  * |                   | Parsing should fail.                         |                           |
  * |-------------------|----------------------------------------------|---------------------------|
- * | cargs_parse_input | * [REQ: 8]                                   |help_argument_present      |
+ * | cargs_parse_input | * [REQ: 8], [REQ: 11]                        |help_argument_present      |
  * |                   |                                              |                           |
  * |                   | Help argument is provided when a required    |                           |
  * |                   | arg was not provided. Parsing should pass.   |                           |
@@ -241,9 +241,10 @@ YT_TEST (cargs, help_argument_present)
     cargs_add_arg ("B", "2nd arg", Integer, NULL);
     cargs_add_arg ("C", "3rd arg", Boolean, NULL);
     cargs_add_arg ("D", "4th arg", Double, NULL);
-    cargs_add_arg ("H", "Help arg", Help, "false");
+    bool* h = cargs_add_arg ("H", "Help arg", Help, "false");
 
     YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
+    YT_EQ_SCALAR (*h, true);
 
     YT_END();
 }
