@@ -24,6 +24,7 @@
  *  - [REQ: 11] For non-list arg, value can be accessed by the pointer.
  *  - [REQ: 14] A non-list arg with a provided default value is treated as optional.
  *  - [REQ: 15] For optional args, the default value is accessed by the pointer if no arg was given.
+ *  - [REQ: 16] Ability to use custom argument interface type.
  * General
  *  - [REQ: 12] All string inputs must have some cap on its length when accessing.
  *
@@ -31,7 +32,8 @@
  * | FUT               | Requirement/Test case                        | Test function name        |
  * |-------------------|----------------------------------------------|---------------------------|
  * | cargs_add_arg,    | * [REQ: 11], [REQ: 9], [REQ: 4]              |non_list_arguments_parsing |
- * | cargs_parse_input |                                              |                           |
+ * | cargs_parse_input |   [REQ: 16]                                  |                           |
+ * |                   |                                              |                           |
  * |                   | Argument values of were provided in cmd line |                           |
  * |                   | Parsing should pass and results match with   |                           |
  * |                   | input.                                       |                           |
@@ -100,6 +102,40 @@
 
 #define ARRAY_LEN(a) (sizeof (a) / sizeof (a[0]))
 
+// Custom Argument Type Interface -----------------------------------------------------------------
+typedef enum {
+    TEST_ENUM_A_ITEM_1,
+    TEST_ENUM_A_ITEM_2,
+} TEST_ENUM_A;
+
+static bool test_enum_a_parse_string (struct Cargs_TypeInterface* self, const char* input,
+                                      Cargs_Slice out)
+{
+#ifdef NDEBUG
+    assert (self != NULL);
+    assert (out.len == sizeof (TEST_ENUM_A));
+#else
+    CARGS_UNUSED (self);
+#endif // NDEBUG
+
+    if (strncmp (input, "item_1", CARGS_MAX_INPUT_VALUE_LEN) == 0) {
+        *(TEST_ENUM_A*)out.address = TEST_ENUM_A_ITEM_1;
+    } else if (strncmp (input, "item_2", CARGS_MAX_INPUT_VALUE_LEN) == 0) {
+        *(TEST_ENUM_A*)out.address = TEST_ENUM_A_ITEM_2;
+    } else {
+        CARGS_ERROR (false, "Invalid arg value: '%s'", input);
+    }
+    return true;
+}
+
+Cargs_TypeInterface TestEnumAInterface = {
+    .name         = "TestEnumA",
+    .format_help  = "(item_1|item_2)",
+    .type_size    = sizeof (TEST_ENUM_A),
+    .parse_string = test_enum_a_parse_string,
+};
+// ------------------------------------------------------------------------------------------------
+
 static bool always_true()
 {
     return true;
@@ -112,18 +148,21 @@ static bool always_false()
 
 YT_TEST (cargs, non_list_arguments_parsing)
 {
-    char* a   = cargs_add_arg ("A", "1st arg", String, NULL);
-    int* b    = cargs_add_arg ("B", "2nd arg", Integer, NULL);
-    bool* c   = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
-    double* d = cargs_add_arg ("D", "4th arg", Double, NULL);
+    char* a        = cargs_add_arg ("A", "1st arg", String, NULL);
+    int* b         = cargs_add_arg ("B", "2nd arg", Integer, NULL);
+    bool* c        = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
+    double* d      = cargs_add_arg ("D", "4th arg", Double, NULL);
+    TEST_ENUM_A* e = cargs_add_arg ("E", "5th arg", TestEnumAInterface, NULL);
 
-    char* argv[] = { "dummy", "-A", "abc", "-B", "1", "-C", "true", "-D", "12.84", NULL };
+    char* argv[] = { "dummy", "-A", "abc",   "-B", "1",      "-C",
+                     "true",  "-D", "12.84", "-E", "item_1", NULL };
     YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
 
     YT_EQ_STRING (a, "abc");
     YT_EQ_SCALAR (*b, 1);
     YT_EQ_SCALAR (*c, true);
     YT_EQ_DOUBLE_REL (*d, 12.84, 0.001);
+    YT_EQ_SCALAR (*e, (unsigned)TEST_ENUM_A_ITEM_1);
 
     YT_END();
 }
