@@ -199,7 +199,7 @@ CARGS__Argument* CARGS__arg_list[CARGS__MAX_ARG_COUNT];
 void cargs_panic (const char* msg)
 {
     if (msg != NULL) {
-        fprintf (stderr, "CARGS__panic! %s\n", msg);
+        fprintf (stderr, "Panic! %s\n", msg);
     }
     exit (1);
 }
