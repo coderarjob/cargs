@@ -62,7 +62,7 @@
 #ifdef CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE
     #define CARGS__ARGUMENT_PREFIX_CHAR CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE
 #else
-    #define CARGS__ARGUMENT_PREFIX_CHAR '-'
+    #define CARGS__ARGUMENT_PREFIX_CHAR "-"
 #endif // CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE
 
 #define CARGS_PARENT_OF(self, type, field) ((type*)((uintptr_t)self - offsetof (type, field)))
@@ -104,18 +104,20 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
                             Cargs_TypeInterface interface, const char* default_value,
                             bool (*is_enabled_fn) (void));
 
-static inline void* cargs_add_arg (const char* name, const char* description,
-                                   Cargs_TypeInterface interface, const char* default_value)
-{
-    return CARGS__cargs_add_arg (name, description, interface, default_value, NULL);
-}
+#define CARGS__call_cargs_add_arg(name, description, interface, default_value, is_enabled_fn)     \
+    ({                                                                                            \
+        static_assert (name != NULL, "must be string literal");                                   \
+        static_assert (description != NULL, "must be string literal");                            \
+        static_assert (default_value == NULL || default_value != NULL, "must be string literal"); \
+        CARGS__cargs_add_arg (CARGS__ARGUMENT_PREFIX_CHAR name, description, interface,           \
+                              default_value, is_enabled_fn);                                      \
+    })
 
-static inline void* cargs_add_cond_arg (bool (*is_enabled_fn) (void), const char* name,
-                                        const char* description, Cargs_TypeInterface interface,
-                                        const char* default_value)
-{
-    return CARGS__cargs_add_arg (name, description, interface, default_value, is_enabled_fn);
-}
+#define cargs_add_arg(name, description, interface, default_value) \
+    CARGS__call_cargs_add_arg (name, description, interface, default_value, NULL)
+
+#define cargs_add_cond_arg(is_enabled_fn, name, description, interface, default_value) \
+    CARGS__call_cargs_add_arg (name, description, interface, default_value, is_enabled_fn)
 
 void cargs_cleanup();
 bool cargs_parse_input (int argc, char** argv);
@@ -295,29 +297,9 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
         cargs_panic (NULL);
     }
 
-    char temp_name[CARGS__MAX_NAME_LEN + 1] = { CARGS__ARGUMENT_PREFIX_CHAR,
-                                                0 };    // +1 for '\0' char
-    strncat (temp_name, name, CARGS__MAX_NAME_LEN - 1); // -1 because '-' char is already in
-
-    if (!(new_arg->name = strndup (temp_name, CARGS__MAX_NAME_LEN))) {
-        perror ("ERROR: Allocation failed");
-        cargs_panic (NULL);
-    }
-
-    if (!(new_arg->description = strndup (description, CARGS__MAX_DESCRIPTION_LEN))) {
-        perror ("ERROR: Allocation failed");
-        cargs_panic (NULL);
-    }
-
-    if (default_value != NULL) {
-        if (!(new_arg->default_value = strndup (default_value, CARGS__MAX_DESCRIPTION_LEN))) {
-            perror ("ERROR: Allocation failed");
-            cargs_panic (NULL);
-        }
-    } else {
-        new_arg->default_value = NULL;
-    }
-
+    new_arg->name          = (char*)name;
+    new_arg->description   = (char*)description;
+    new_arg->default_value = (char*)default_value;
     new_arg->dirty    = false; // Initially args are not dirty. Becomes dirty if was modified later.
     new_arg->provided = default_value != NULL;
     new_arg->interface     = interface;
@@ -354,11 +336,6 @@ void cargs_cleanup()
                 free (arg->interface.value);
             }
         }
-        free (arg->name);
-        free (arg->description);
-        if (arg->default_value) {
-            free (arg->default_value);
-        }
         free (arg);
     }
     CARGS__arg_list_count = 0;
@@ -384,7 +361,7 @@ bool cargs_parse_input (int argc, char** argv)
     for (char* arg = NULL; (arg = *argv) != NULL; argv++) {
         // TODO: argument value/parameter might start with CARGS__ARGUMENT_PREFIX_CHAR
 
-        if (arg[0] == CARGS__ARGUMENT_PREFIX_CHAR) {
+        if (arg[0] == CARGS__ARGUMENT_PREFIX_CHAR[0]) {
             if (!(the_arg = CARGS__find_by_name (arg))) {
                 CARGS_ERROR (false, "ERROR: Unknown argument '%s'", arg);
             }

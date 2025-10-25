@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #define CARGS_IMPLEMENTATION
-#define CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE '/'
+#define CARGS_ARGUMENT_PREFIX_CHAR_OVERRIDE "/"
 #include "../cargs.h"
 
 #define USAGE()                                \
