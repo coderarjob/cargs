@@ -102,22 +102,30 @@ void cargs_panic (const char* msg);
 
 void* CARGS__cargs_add_arg (const char* name, const char* description,
                             Cargs_TypeInterface interface, const char* default_value,
-                            bool (*is_enabled_fn) (void));
+                            bool (*is_enabled_fn) (void), const char* cond_desciption);
 
-#define CARGS__call_cargs_add_arg(name, description, interface, default_value, is_enabled_fn)     \
+#define CARGS__call_cargs_add_arg(name, description, interface, default_value, is_enabled_fn,     \
+                                  cond_desciption)                                                \
     ({                                                                                            \
         static_assert (name != NULL, "must be string literal");                                   \
         static_assert (description != NULL, "must be string literal");                            \
         static_assert (default_value == NULL || default_value != NULL, "must be string literal"); \
+        static_assert (cond_desciption == NULL || cond_desciption != NULL,                        \
+                       "must be string literal");                                                 \
         CARGS__cargs_add_arg (CARGS__ARGUMENT_PREFIX_CHAR name, description, interface,           \
-                              default_value, is_enabled_fn);                                      \
+                              default_value, is_enabled_fn, cond_desciption);                     \
     })
 
 #define cargs_add_arg(name, description, interface, default_value) \
-    CARGS__call_cargs_add_arg (name, description, interface, default_value, NULL)
+    CARGS__call_cargs_add_arg (name, description, interface, default_value, NULL, NULL)
 
 #define cargs_add_cond_arg(is_enabled_fn, name, description, interface, default_value) \
-    CARGS__call_cargs_add_arg (name, description, interface, default_value, is_enabled_fn)
+    CARGS__call_cargs_add_arg (name, description, interface, default_value, is_enabled_fn, NULL)
+
+#define cargs_add_cond_arg_d(is_enabled_fn, cond_desciption, name, description, interface, \
+                             default_value)                                                \
+    CARGS__call_cargs_add_arg (name, description, interface, default_value, is_enabled_fn, \
+                               cond_desciption)
 
 void cargs_cleanup();
 bool cargs_parse_input (int argc, char** argv);
@@ -152,8 +160,11 @@ typedef struct CARGS__Argument {
     bool provided; // true if some value was provided. Always true for optional arguments.
     bool dirty;    // true mean value was updated during parsing.
     Cargs_TypeInterface interface;
-    bool (*is_enabled_fn) (void); // If NULL, arg is always enabled, otherwise its enabled when this
-                                  // predicate returns true.
+    struct {
+        bool (*is_enabled_fn) (void); // If NULL, arg is always enabled, otherwise its enabled when
+                                      // this predicate returns true.
+        char* description;            // Text which describes the condition for help message.
+    } condition;
 } CARGS__Argument;
 
 unsigned int CARGS__arg_list_count = 0;
@@ -276,15 +287,15 @@ CARGS__Argument* CARGS__find_by_value_address (const void* needle)
 
 bool CARGS__is_arg_enabled (CARGS__Argument* arg)
 {
-    if (arg->is_enabled_fn != NULL) {
-        return arg->is_enabled_fn();
+    if (arg->condition.is_enabled_fn != NULL) {
+        return arg->condition.is_enabled_fn();
     }
     return true;
 }
 
 void* CARGS__cargs_add_arg (const char* name, const char* description,
                             Cargs_TypeInterface interface, const char* default_value,
-                            bool (*is_enabled_fn) (void))
+                            bool (*is_enabled_fn) (void), const char* cond_desciption)
 {
     CARGS__Argument* new_arg = NULL;
 
@@ -302,8 +313,9 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
     new_arg->default_value = (char*)default_value;
     new_arg->dirty    = false; // Initially args are not dirty. Becomes dirty if was modified later.
     new_arg->provided = default_value != NULL;
-    new_arg->interface     = interface;
-    new_arg->is_enabled_fn = is_enabled_fn;
+    new_arg->interface               = interface;
+    new_arg->condition.is_enabled_fn = is_enabled_fn;
+    new_arg->condition.description   = (char*)cond_desciption;
 
     if (interface.allow_multiple) {
         if (default_value != NULL) {
@@ -426,8 +438,14 @@ exit:
 static void CARGS__print_help_message (CARGS__Argument* arg, size_t max_arg_name_len,
                                        size_t max_arg_format_help_len)
 {
-    fprintf (stderr, "%-*s %-*s %s ", (int)max_arg_name_len, arg->name,
-             (int)max_arg_format_help_len, arg->interface.format_help, arg->description);
+    if (arg->condition.description == NULL) {
+        fprintf (stderr, "%-*s %-*s %s ", (int)max_arg_name_len, arg->name,
+                 (int)max_arg_format_help_len, arg->interface.format_help, arg->description);
+    } else {
+        fprintf (stderr, "%-*s %-*s %s. %s ", (int)max_arg_name_len, arg->name,
+                 (int)max_arg_format_help_len, arg->interface.format_help,
+                 arg->condition.description, arg->description);
+    }
 
     if (arg->default_value) {
         fprintf (stderr, "(Default set to '%s')\n", arg->default_value);
@@ -456,7 +474,7 @@ void cargs_print_help()
     fprintf (stderr, "Usage:\n");
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
-        if (the_arg->is_enabled_fn == NULL) {
+        if (the_arg->condition.is_enabled_fn == NULL) {
             CARGS__print_help_message (the_arg, max_arg_name_len, max_arg_format_help_len);
         } else {
             conditional_arg_count++;
@@ -470,7 +488,7 @@ void cargs_print_help()
     fprintf (stderr, "Conditional:\n");
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
-        if (the_arg->is_enabled_fn != NULL) {
+        if (the_arg->condition.is_enabled_fn != NULL) {
             CARGS__print_help_message (the_arg, max_arg_name_len, max_arg_format_help_len);
         }
     }

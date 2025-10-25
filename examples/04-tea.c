@@ -51,20 +51,20 @@ int main (int argc, char** argv)
     config.infiles = cargs_add_arg ("I", "Files that need to be processed", CARGS_LISTOF (String),
                                     NULL);
 
-    config.output_to_stdout = cargs_add_cond_arg (stdout_print_enable, "N",
-                                                  "When decrypting, display output to stdout", Flag,
-                                                  "false");
+    config.output_to_stdout = cargs_add_cond_arg_d (stdout_print_enable, "When -e is false", "N",
+                                                    "Display output to stdout", Flag, "false");
 
     config.post_delete_enabled =
-        cargs_add_cond_arg (post_delete_enable, "D",
-                            "Deletes input files after encryption/decryption", Flag, "false");
+        cargs_add_cond_arg_d (post_delete_enable, "When -N is false", "D",
+                              "Deletes input files after encryption/decryption", Flag, "false");
 
-    config.verbose_enabled = cargs_add_cond_arg (verbose_is_enabled, "v", "Verbose", Flag, "false");
+    config.verbose_enabled = cargs_add_cond_arg_d (verbose_is_enabled, "When -N is false", "v",
+                                                   "Verbose", Flag, "false");
 
     config.display_help = cargs_add_arg ("h", "Display this help message", Help, "false");
 
-    config.key = cargs_add_cond_arg (key_as_param_enable, "k", "16 byte key (as argument)", String,
-                                     NULL);
+    config.key = cargs_add_cond_arg_d (key_as_param_enable, "When -K is false", "k",
+                                       "16 byte key (as argument)", String, NULL);
 
     if (!cargs_parse_input (argc, argv)) {
         USAGE (argv[0]);
