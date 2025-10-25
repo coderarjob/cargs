@@ -92,10 +92,36 @@ typedef struct {
     size_t len;
 } Cargs_ArrayList;
 
-#define CARGS_ERROR(ret, msg, ...)                           \
-    do {                                                     \
-        fprintf (stderr, "ERROR: " msg "\n", ##__VA_ARGS__); \
-        return ret;                                          \
+#define CARGS__COL_GRAY       "\x1b[0;90m"
+#define CARGS__COL_YELLOW     "\x1b[0m\x1b[0;33m"
+#define CARGS__COL_BOLD_RED   "\x1b[0m\x1b[1;31m"
+#define CARGS__COL_BOLD_WHITE "\x1b[0m\x1b[1;97m"
+#define CARGS__COL_WHITE      "\x1b[0m\x1b[0;97m"
+#define CARGS__COL_RESET      "\x1b[0m"
+
+#ifdef CARGS_DISABLE_COLORS
+    #define CARGS__COL_ERROR        ""
+    #define CARGS__COL_ERROR_MSG    ""
+    #define CARGS__COL_DEFAULS      ""
+    #define CARGS__COL_REQUIRED     ""
+    #define CARGS__COL_ENABLED_ARG  ""
+    #define CARGS__COL_DISABLED_ARG ""
+    #define CARGS__COL_NOTE         ""
+#else
+    #define CARGS__COL_ERROR        CARGS__COL_BOLD_RED
+    #define CARGS__COL_ERROR_MSG    CARGS__COL_WHITE
+    #define CARGS__COL_DEFAULS      CARGS__COL_GRAY
+    #define CARGS__COL_REQUIRED     CARGS__COL_WHITE
+    #define CARGS__COL_ENABLED_ARG  CARGS__COL_WHITE
+    #define CARGS__COL_DISABLED_ARG CARGS__COL_GRAY
+    #define CARGS__COL_NOTE         CARGS__COL_YELLOW
+#endif // CARGS_DISABLE_COLORS
+
+#define CARGS_ERROR(ret, msg, ...)                                                         \
+    do {                                                                                   \
+        fprintf (stderr, "%sERROR:%s " msg "%s\n", CARGS__COL_ERROR, CARGS__COL_ERROR_MSG, \
+                 ##__VA_ARGS__, CARGS__COL_RESET);                                         \
+        return ret;                                                                        \
     } while (0)
 
 void cargs_panic (const char* msg);
@@ -438,19 +464,26 @@ exit:
 static void CARGS__print_help_message (CARGS__Argument* arg, size_t max_arg_name_len,
                                        size_t max_arg_format_help_len)
 {
+    const char* arg_name_color = (arg->condition.is_enabled_fn != NULL &&
+                                  !arg->condition.is_enabled_fn())
+                                     ? CARGS__COL_DISABLED_ARG
+                                     : CARGS__COL_ENABLED_ARG;
+
     if (arg->condition.description == NULL) {
-        fprintf (stderr, "%-*s %-*s %s ", (int)max_arg_name_len, arg->name,
-                 (int)max_arg_format_help_len, arg->interface.format_help, arg->description);
+        fprintf (stderr, "%s%-*s%s %-*s %s", arg_name_color, (int)max_arg_name_len, arg->name,
+                 CARGS__COL_RESET, (int)max_arg_format_help_len, arg->interface.format_help,
+                 arg->description);
     } else {
-        fprintf (stderr, "%-*s %-*s %s. %s ", (int)max_arg_name_len, arg->name,
-                 (int)max_arg_format_help_len, arg->interface.format_help,
+        fprintf (stderr, "%s%-*s%s %-*s %s. %s", arg_name_color, (int)max_arg_name_len, arg->name,
+                 CARGS__COL_RESET, (int)max_arg_format_help_len, arg->interface.format_help,
                  arg->condition.description, arg->description);
     }
 
     if (arg->default_value) {
-        fprintf (stderr, "(Default set to '%s')\n", arg->default_value);
+        fprintf (stderr, " %s(Defaults to '%s')\n%s", CARGS__COL_DEFAULS, arg->default_value,
+                 CARGS__COL_RESET);
     } else {
-        fprintf (stderr, "(Required)\n");
+        fprintf (stderr, " %s(%s)%s\n", CARGS__COL_REQUIRED, "Required", CARGS__COL_RESET);
     }
 }
 
@@ -462,7 +495,7 @@ void cargs_print_help()
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
         max_arg_name_len         = CARGS__MAX (strlen (the_arg->name), max_arg_name_len);
-        max_arg_format_help_len  = CARGS__MAX (strlen (the_arg->interface.format_help),
+        max_arg_format_help_len  = CARGS__MAX (strlen (the_arg->interface.format_help) + 3,
                                                max_arg_format_help_len);
     }
 
@@ -485,7 +518,13 @@ void cargs_print_help()
         return; // No conditional arguments
     }
 
-    fprintf (stderr, "Conditional:\n");
+    fprintf (stderr, "Conditional:");
+    #ifndef CARGS_DISABLE_COLORS
+    fprintf (stderr, " %sAvailable%s | %sDisabled%s arguments:%s", CARGS__COL_ENABLED_ARG,
+             CARGS__COL_NOTE, CARGS__COL_DISABLED_ARG, CARGS__COL_NOTE, CARGS__COL_RESET);
+    #endif // CARGS_DISABLE_COLORS
+    fprintf (stderr, "\n");
+
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
         if (the_arg->condition.is_enabled_fn != NULL) {
