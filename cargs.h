@@ -284,20 +284,22 @@ void* CARGS__arl_dealloc (Cargs_ArrayList* arl)
 /*******************************************************************************************
  * Argument functions
  *********************************************************************************************/
-void CARGS__assign_value (Cargs_TypeInterface* interface, const char* input)
+bool CARGS__assign_value (Cargs_TypeInterface* interface, const char* input)
 {
     // Special case for flags. Flag arguments must always have a default value, which gets acted on
     // when the flag argument is found during argument parsing.
     if (interface->is_flag) {
         assert (input != NULL);
-        cargs_bool_parse_string (interface, input,
-                                 CARGS__SLICE_OF (interface->value, interface->type_size));
+        return cargs_bool_parse_string (interface, input,
+                                        CARGS__SLICE_OF (interface->value, interface->type_size));
     } else {
         if (input != NULL) {
-            interface->parse_string (interface, input,
-                                     CARGS__SLICE_OF (interface->value, interface->type_size));
+            return interface->parse_string (interface, input,
+                                            CARGS__SLICE_OF (interface->value,
+                                                             interface->type_size));
         }
     }
+    return true;
 }
 
 CARGS__Argument* CARGS__find_by_value_address (const void* needle)
@@ -354,7 +356,9 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
             cargs_panic (NULL);
         }
 
-        CARGS__assign_value (&new_arg->interface, default_value);
+        if (!CARGS__assign_value (&new_arg->interface, default_value)) {
+            cargs_panic ("Invalid default value");
+        }
     }
 
     CARGS__arg_list[CARGS__arg_list_count++] = new_arg;
@@ -401,7 +405,7 @@ bool cargs_parse_input (int argc, char** argv)
 
         if (arg[0] == CARGS__ARGUMENT_PREFIX_CHAR[0]) {
             if (!(the_arg = CARGS__find_by_name (arg))) {
-                CARGS_ERROR (false, "ERROR: Unknown argument '%s'", arg);
+                CARGS_ERROR (false, "Unknown argument '%s'", arg);
             }
 
             // Args updated during parsing are flaged dirty
@@ -410,33 +414,41 @@ bool cargs_parse_input (int argc, char** argv)
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
             // value to the flag argument) now when it is first detected.
             if (the_arg->interface.is_flag) {
-                the_arg->provided = the_arg->interface.parse_string (
-                    &the_arg->interface, arg,
-                    CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size));
                 // Special case for Help. If a help flag is found we skip the rest of the
                 // parsing and simply return.
                 if (strcmp ("help", the_arg->interface.name) == 0) {
                     goto exit;
                 }
-            }
-        } else {
-            assert (the_arg != NULL);
-
-            if (the_arg->interface.allow_multiple) {
-                void* new_item = CARGS__arl_append ((Cargs_ArrayList*)the_arg->interface.value,
-                                                    NULL); // Dummy insert
-                assert (new_item != NULL);
-
-                the_arg->provided = the_arg->interface.parse_string (
-                    &the_arg->interface, arg,
-                    CARGS__SLICE_OF (new_item, the_arg->interface.type_size));
-            } else {
-                assert ((the_arg->default_value && the_arg->provided) ||
-                        (!the_arg->default_value && !the_arg->provided));
 
                 the_arg->provided = the_arg->interface.parse_string (
                     &the_arg->interface, arg,
                     CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size));
+
+                assert (the_arg->provided); // Parsing of flags cannot fail, because it takes no
+                                            // value.
+            }
+        } else {
+            assert (the_arg != NULL);
+
+            Cargs_Slice output  = { 0 };
+            void* new_list_item = NULL;
+
+            if (the_arg->interface.allow_multiple) {
+                new_list_item = CARGS__arl_append ((Cargs_ArrayList*)the_arg->interface.value,
+                                                   NULL); // Dummy insert
+                assert (new_list_item != NULL);
+
+                output = CARGS__SLICE_OF (new_list_item, the_arg->interface.type_size);
+            } else {
+                assert ((the_arg->default_value && the_arg->provided) ||
+                        (!the_arg->default_value && !the_arg->provided));
+
+                output = CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size);
+            }
+
+            if (!(the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
+                                                                       output))) {
+                CARGS_ERROR (false, "Invalid '%s' argument value: '%s'", the_arg->name, arg);
             }
         }
     }
@@ -549,7 +561,7 @@ bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* inpu
     } else if (strncmp ("false", input, CARGS_MAX_INPUT_VALUE_LEN) == 0) {
         *(bool*)out.address = false;
     } else {
-        CARGS_ERROR (false, "Invalid boolean input");
+        return false;
     }
 
     return true;
@@ -566,11 +578,7 @@ bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input
 
     errno              = 0; // To detect if strtol failed
     *(int*)out.address = strtol (input, NULL, 10);
-    if (errno == ERANGE) {
-        CARGS_ERROR (false, "Invalid integer input");
-    }
-
-    return true;
+    return errno != ERANGE;
 }
 
 bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* input,
@@ -630,11 +638,7 @@ bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* in
     errno = 0; // To detect if strtol failed
 
     *(double*)out.address = strtod (input, NULL);
-    if (errno == ERANGE) {
-        CARGS_ERROR (false, "Invalid floating point input");
-    }
-
-    return true;
+    return errno != ERANGE;
 }
 #endif // CARGS_IMPLEMENTATION
 

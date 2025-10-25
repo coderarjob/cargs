@@ -28,7 +28,7 @@ bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input, Ca
     } else if (strncmp ("noise", input, CARGS_MAX_INPUT_VALUE_LEN) == 0) {
         mode = MODE_NOISE;
     } else {
-        CARGS_ERROR (false, "Invalid mode: '%s'", input);
+        return false;
     }
 
     *(Modes*)out.address = mode;

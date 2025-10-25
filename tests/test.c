@@ -123,7 +123,7 @@ static bool test_enum_a_parse_string (struct Cargs_TypeInterface* self, const ch
     } else if (strncmp (input, "item_2", CARGS_MAX_INPUT_VALUE_LEN) == 0) {
         *(TEST_ENUM_A*)out.address = TEST_ENUM_A_ITEM_2;
     } else {
-        CARGS_ERROR (false, "Invalid arg value: '%s'", input);
+        return false;
     }
     return true;
 }
