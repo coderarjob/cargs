@@ -213,7 +213,9 @@ void cargs_panic (const char* msg)
             .address = (a), .len = (l) \
         }
 
-    #define CARGS__ARRAY_LEN(a) (sizeof (a) / sizeof (a[0]))
+    #define CARGS__ARRAY_LEN(a)        (sizeof (a) / sizeof (a[0]))
+
+    #define CARGS__LIST_MARKING_STRING ".."
 
 /*******************************************************************************************
  * ArrayList functions
@@ -482,14 +484,20 @@ static void CARGS__print_help_message (CARGS__Argument* arg, size_t max_arg_name
                                      ? CARGS__COL_DISABLED_ARG
                                      : CARGS__COL_ENABLED_ARG;
 
+    const char* list_indication_str = (arg->interface.allow_multiple) ? CARGS__LIST_MARKING_STRING
+                                                                      : "";
+
+    assert (max_arg_format_help_len >= strlen (arg->interface.format_help));
+    int arg_format_help_len = max_arg_format_help_len - strlen (arg->interface.format_help);
+
     if (arg->condition.description == NULL) {
-        fprintf (stderr, "%s%-*s%s %-*s %s", arg_name_color, (int)max_arg_name_len, arg->name,
-                 CARGS__COL_RESET, (int)max_arg_format_help_len, arg->interface.format_help,
-                 arg->description);
+        fprintf (stderr, "%s%-*s%s %s%-*s %s", arg_name_color, (int)max_arg_name_len, arg->name,
+                 CARGS__COL_RESET, arg->interface.format_help, arg_format_help_len,
+                 list_indication_str, arg->description);
     } else {
-        fprintf (stderr, "%s%-*s%s %-*s %s. %s", arg_name_color, (int)max_arg_name_len, arg->name,
-                 CARGS__COL_RESET, (int)max_arg_format_help_len, arg->interface.format_help,
-                 arg->condition.description, arg->description);
+        fprintf (stderr, "%s%-*s%s %s%-*s %s. %s", arg_name_color, (int)max_arg_name_len, arg->name,
+                 CARGS__COL_RESET, arg->interface.format_help, arg_format_help_len,
+                 list_indication_str, arg->condition.description, arg->description);
     }
 
     if (arg->default_value) {
@@ -505,15 +513,21 @@ void cargs_print_help()
     size_t max_arg_name_len        = 0;
     size_t max_arg_format_help_len = 0;
 
+    size_t list_indication_string_len = strlen (CARGS__LIST_MARKING_STRING);
+
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* the_arg = CARGS__arg_list[i];
         max_arg_name_len         = CARGS__MAX (strlen (the_arg->name), max_arg_name_len);
-        max_arg_format_help_len  = CARGS__MAX (strlen (the_arg->interface.format_help) + 3,
-                                               max_arg_format_help_len);
+        max_arg_format_help_len  = CARGS__MAX (max_arg_format_help_len,
+                                               (strlen (the_arg->interface.format_help) +
+                                               (the_arg->interface.allow_multiple
+                                                     ? list_indication_string_len
+                                                     : 0)));
     }
 
     assert (max_arg_name_len > 0 && max_arg_name_len <= CARGS_MAX_INPUT_VALUE_LEN);
-    assert (max_arg_format_help_len > 0 && max_arg_format_help_len <= CARGS_MAX_INPUT_VALUE_LEN);
+    assert (max_arg_format_help_len > 0 &&
+            max_arg_format_help_len <= CARGS_MAX_INPUT_VALUE_LEN + list_indication_string_len);
 
     size_t conditional_arg_count = 0;
 
