@@ -245,7 +245,7 @@ Cargs_ArrayList* CARGS__arl_new_with_capacity (size_t capacity, size_t item_size
     return newlist;
 }
 
-void* CARGS__arl_append (Cargs_ArrayList* arl, void* c)
+void* CARGS__arl_push (Cargs_ArrayList* arl, void* c)
 {
     if (arl->len >= arl->capacity) {
         assert (arl->capacity > 0);
@@ -428,7 +428,6 @@ bool cargs_parse_input (int argc, char** argv)
                 if (strcmp ("help", the_arg->interface.name) == 0) {
                     goto exit;
                 }
-
             }
         } else {
             assert (the_arg != NULL);
@@ -437,8 +436,8 @@ bool cargs_parse_input (int argc, char** argv)
             void* new_list_item = NULL;
 
             if (the_arg->interface.allow_multiple) {
-                new_list_item = CARGS__arl_append ((Cargs_ArrayList*)the_arg->interface.value,
-                                                   NULL); // Dummy insert
+                new_list_item = CARGS__arl_push ((Cargs_ArrayList*)the_arg->interface.value,
+                                                 NULL); // Dummy insert
                 assert (new_list_item != NULL);
 
                 output = CARGS__SLICE_OF (new_list_item, the_arg->interface.type_size);
