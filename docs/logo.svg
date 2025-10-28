@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="42.898281mm"
+   height="15.51031mm"
+   viewBox="0 0 42.898281 15.51031"
+   version="1.1"
+   id="svg1"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="42.898281"
+       height="15.51031"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-26.756381,-198.22264)">
+    <g
+       id="g8"
+       transform="matrix(0.54582895,0,0,0.54582895,23.130159,95.150134)">
+      <path
+         id="path8"
+         style="font-weight:bold;font-size:84.9901px;line-height:1;font-family:Hermit;-inkscape-font-specification:'Hermit Bold';text-align:end;letter-spacing:-1.91227px;word-spacing:0px;text-anchor:end;fill:#4ab563;stroke-width:2.47845;stroke-linecap:square"
+         d="m 66.646901,188.83663 v 6.25144 h 4.38165 c 6.81985,0 6.81988,7.95642 6.81988,7.95642 0,0 -3e-5,7.95676 -6.81988,7.95676 h -4.38165 v 6.25145 h 4.38165 c 14.20802,0 14.20786,-14.20821 14.20786,-14.20821 0,0 1.6e-4,-14.20786 -14.20786,-14.20786 z" />
+      <path
+         id="path7"
+         style="font-weight:bold;font-size:84.9901px;line-height:1;font-family:Hermit;-inkscape-font-specification:'Hermit Bold';text-align:end;letter-spacing:-1.91227px;word-spacing:0px;text-anchor:end;fill:#d6a206;stroke-width:2.47845;stroke-linecap:square"
+         d="m 25.233023,217.2527 v -6.25144 h -4.381646 c -6.819852,0 -6.819884,-7.95642 -6.819884,-7.95642 0,0 3.2e-5,-7.95676 6.819884,-7.95676 h 4.381646 v -6.25145 h -4.381646 c -14.2080251,0 -14.2078626,14.20821 -14.2078626,14.20821 0,0 -1.625e-4,14.20786 14.2078626,14.20786 z" />
+      <path
+         id="text1"
+         style="font-weight:bold;font-size:84.9901px;line-height:1;font-family:Hermit;-inkscape-font-specification:'Hermit Bold';text-align:end;letter-spacing:-1.91227px;word-spacing:0px;text-anchor:end;fill:#ffc107;stroke-width:2.47845;stroke-linecap:square"
+         d="m 26.406274,217.2527 v -6.25144 h -4.381646 c -6.819852,0 -6.819884,-7.95642 -6.819884,-7.95642 0,0 3.2e-5,-7.95676 6.819884,-7.95676 h 4.381646 v -6.25145 h -4.381646 c -14.2080254,0 -14.2078629,14.20821 -14.2078629,14.20821 0,0 -1.625e-4,14.20786 14.2078629,14.20786 z" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:24.3079px;line-height:1;font-family:Hermit;-inkscape-font-specification:'Hermit Bold';text-align:end;text-decoration-color:#000000;letter-spacing:-0.546927px;word-spacing:0px;writing-mode:lr-tb;direction:ltr;text-anchor:end;fill:#d63384;stroke-width:1.06007;stroke-linecap:square"
+         x="75.273071"
+         y="209.31351"
+         id="text2"><tspan
+           sodipodi:role="line"
+           id="tspan2"
+           style="fill:#d63384;stroke-width:1.06007"
+           x="74.726143"
+           y="209.31351">args</tspan></text>
+      <path
+         id="path5"
+         style="font-weight:bold;font-size:84.9901px;line-height:1;font-family:Hermit;-inkscape-font-specification:'Hermit Bold';text-align:end;letter-spacing:-1.91227px;word-spacing:0px;text-anchor:end;fill:#8fd19e;stroke-width:2.47845;stroke-linecap:square"
+         d="m 64.803222,188.83663 v 6.25144 h 4.38165 c 6.81985,0 6.81988,7.95642 6.81988,7.95642 0,0 -3e-5,7.95676 -6.81988,7.95676 h -4.38165 v 6.25145 h 4.38165 c 14.20802,0 14.20786,-14.20821 14.20786,-14.20821 0,0 1.6e-4,-14.20786 -14.20786,-14.20786 z" />
+    </g>
+  </g>
+</svg>
