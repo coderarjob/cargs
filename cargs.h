@@ -242,6 +242,7 @@ Cargs_ArrayList* CARGS__arl_new_with_capacity (size_t capacity, size_t item_size
         }
     }
 
+    assert (newlist != NULL);
     return newlist;
 }
 
@@ -547,7 +548,7 @@ void cargs_print_help()
     fprintf (stderr, "\nConditional ");
     #ifndef CARGS_DISABLE_COLORS
     fprintf (stderr, "(shows %sAvailable%s & %sDisabled%s) arguments:", CARGS__COL_ENABLED_ARG,
-             CARGS__COL_NOTE, CARGS__COL_DISABLED_ARG, CARGS__COL_RESET);
+             CARGS__COL_RESET, CARGS__COL_DISABLED_ARG, CARGS__COL_RESET);
     #endif // CARGS_DISABLE_COLORS
     fprintf (stderr, "\n");
 
