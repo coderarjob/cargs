@@ -6,8 +6,11 @@ if [ $DIRNAME = "." ]; then
     ROOT_PATH=".."
 fi
 OUTFILE=$ROOT_PATH/tests/test
+SAN_OPTS="address,null,pointer-overflow,object-size,return,unreachable,bounds"
 
+#===============================================================================
 # Build examples
+#===============================================================================
 echo "[1/2] Building examples.."
 
 EXAMPLES_SRC=(
@@ -22,18 +25,25 @@ for cfile in ${EXAMPLES_SRC[@]}; do
     gcc -Wall -Wextra $cfile -o $OUTFILE || exit
 done
 
+#===============================================================================
 # Build and run tests
+#===============================================================================
 echo "[2/2] Compiling and running tests.."
 
-TEST_SRC=$ROOT_PATH/tests/test.c
+TEST_SRC=(
+    "$ROOT_PATH/tests/test.c"
+    "$ROOT_PATH/tests/arraylist_test.c"
+)
 
-SAN_OPTS="address,null,pointer-overflow,object-size,return,unreachable,bounds"
+for cfile in ${TEST_SRC[@]}; do
+    echo "Compiling '$cfile'.."
+    gcc -g                             \
+        -Wall -Wextra                  \
+        -fsanitize=$SAN_OPTS $cfile    \
+        -o $OUTFILE || exit
 
-gcc -g                             \
-    -Wall -Wextra                  \
-    -fsanitize=$SAN_OPTS $TEST_SRC \
-    -o $OUTFILE || exit
-
-./$OUTFILE || exit
+    ./$OUTFILE || exit
+done
+#===============================================================================
 
 echo "[All tests pass]"
