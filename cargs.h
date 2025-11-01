@@ -349,10 +349,15 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
     new_arg->condition.description   = (char*)cond_desciption;
 
     if (interface.allow_multiple) {
-        if (default_value != NULL) {
-            cargs_panic ("Lists do not have a default value");
-        }
         new_arg->interface.value = CARGS__arl_new_with_capacity (10, interface.type_size);
+        if (default_value != NULL) {
+            void* dest = CARGS__arl_push ((Cargs_ArrayList*)new_arg->interface.value,
+                                          NULL); // dummy insert
+            assert (dest != NULL);               // push should ensure allocation/relocation worked!
+
+            new_arg->interface.parse_string (&new_arg->interface, default_value,
+                                             CARGS__SLICE_OF (dest, new_arg->interface.type_size));
+        }
     } else {
         if (!(new_arg->interface.value = malloc (new_arg->interface.type_size))) {
             perror ("ERROR: Allocation failed");
@@ -411,12 +416,12 @@ bool cargs_parse_input (int argc, char** argv)
                 CARGS_ERROR (false, "Unknown argument '%s'", arg);
             }
 
-            // Args updated during parsing are flaged dirty
-            the_arg->dirty = true;
-
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
             // value to the flag argument) now when it is first detected.
             if (the_arg->interface.is_flag) {
+                // Args updated during parsing are flaged dirty
+                the_arg->dirty = true;
+
                 the_arg->provided = the_arg->interface.parse_string (
                     &the_arg->interface, arg,
                     CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size));
@@ -437,10 +442,13 @@ bool cargs_parse_input (int argc, char** argv)
             void* new_list_item = NULL;
 
             if (the_arg->interface.allow_multiple) {
-                new_list_item = CARGS__arl_push ((Cargs_ArrayList*)the_arg->interface.value,
-                                                 NULL); // Dummy insert
-                assert (new_list_item != NULL);
+                Cargs_ArrayList* list = (Cargs_ArrayList*)the_arg->interface.value;
 
+                new_list_item = (list->len == 1 && !the_arg->dirty)
+                                    ? list->buffer
+                                    : CARGS__arl_push (list, NULL); // Dummy insert
+
+                assert (new_list_item != NULL);
                 output = CARGS__SLICE_OF (new_list_item, the_arg->interface.type_size);
             } else {
                 assert ((the_arg->default_value && the_arg->provided) ||
@@ -453,6 +461,9 @@ bool cargs_parse_input (int argc, char** argv)
                                                                        output))) {
                 CARGS_ERROR (false, "Invalid '%s' argument value: '%s'", the_arg->name, arg);
             }
+
+            // Args updated during parsing are flaged dirty
+            the_arg->dirty = true;
         }
     }
 

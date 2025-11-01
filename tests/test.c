@@ -19,10 +19,11 @@
  *  - [REQ: 8 ] Help arg should stop further arg parsing and pass.
  *  - [REQ: 9 ] For non list args, provided value is parsed as per Interface type.
  *  - [REQ: 13] For list args, all provided values are parsed as per Interface type.
+ *  - [REQ: 18] Providing a value to optional args must override its default value.
  * cargs_add_arg
  *  - [REQ: 10] For list arg, multiple values of any number can be accessed by the pointer.
  *  - [REQ: 11] For non-list arg, value can be accessed by the pointer.
- *  - [REQ: 14] A non-list arg with a provided default value is treated as optional.
+ *  - [REQ: 14] Args provided with a default value are treated as optional.
  *  - [REQ: 15] For optional args, the default value is accessed by the pointer if no arg was given.
  *  - [REQ: 16] Ability to use custom argument interface type.
  * General
@@ -77,12 +78,23 @@
  * |                   | and none provided in command line.           |                           |
  * |                   | Parsing should pass.                         |                           |
  * |-------------------|----------------------------------------------|---------------------------|
- * | cargs_add_arg,    | * [REQ: 5], [REQ: 15], [REQ: 9]              |default_values_override    |
- * | cargs_parse_input |                                              |                           |
+ * | cargs_add_arg,    | * [REQ: 5], [REQ: 15], [REQ: 9], [REQ: 18]   |nonlist_default_arg_overrid|
+ * | cargs_parse_input |                                              |e                          |
  * |                   |                                              |                           |
- * |                   | Default values for arguments where provided  |                           |
- * |                   | and were also provided in command line.      |                           |
- * |                   | Parsing should pass.                         |                           |
+ * |                   | Default values for non-list arguments where  |                           |
+ * |                   | provided and were also provided in command   |                           |
+ * |                   | line. Parsing should pass.                   |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_add_arg,    | * [REQ: 5], [REQ: 15], [REQ: 9], [REQ: 18]   |list_default_arg_override  |
+ * | cargs_parse_input |                                              |                           |
+ * |                   | Default values for list arguments where      |                           |
+ * |                   | provided and were also provided in command   |                           |
+ * |                   | line. Parsing should pass.                   |                           |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | First argument is same as the default value  | Test# 1                   |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | First argument is not same as the default    | Test# 2                   |
+ * |                   | value.                                       |                           |
  * |-------------------|----------------------------------------------|---------------------------|
  * | cargs_parse_input | * [REQ: 7]                                   |unknown_argument_in_cl     |
  * |                   |                                              |                           |
@@ -268,7 +280,7 @@ YT_TEST (cargs, default_values)
     YT_END();
 }
 
-YT_TEST (cargs, default_value_override)
+YT_TEST (cargs, nonlist_default_arg_override)
 {
     char* argv[] = { "dummy", "-A", "def", "-B", "23", "-C", "true", "-D", "220.72", NULL };
 
@@ -283,6 +295,25 @@ YT_TEST (cargs, default_value_override)
     YT_EQ_SCALAR (*b, 23);
     YT_EQ_SCALAR (*c, true);
     YT_EQ_DOUBLE_REL (*d, 220.72, 0.001);
+
+    YT_END();
+}
+
+#define LIST_DEFAULT_INTEGER_VALUE "13"
+
+YT_TESTP (cargs, list_default_arg_override, char*)
+{
+    char* first_value = YT_ARG_0();
+
+    char* argv[] = { "dummy", "-A", first_value, "2", "3", NULL };
+
+    Cargs_ArrayList* a = cargs_add_arg ("A", "1st arg", CARGS_LISTOF (Integer),
+                                        LIST_DEFAULT_INTEGER_VALUE);
+    YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
+
+    YT_EQ_SCALAR (((int*)(a->buffer))[0], atoi (first_value));
+    YT_EQ_SCALAR (((int*)(a->buffer))[1], 2);
+    YT_EQ_SCALAR (((int*)(a->buffer))[2], 3);
 
     YT_END();
 }
@@ -323,7 +354,11 @@ int main (void)
     non_list_arguments_parsing();
     required_arguments (2, YT_ARG (bool){ true, false });
     default_values();
-    default_value_override();
+    nonlist_default_arg_override();
+    // list_default_arg_override:
+    // Param 1: Value same as default value was provided in command line. Should handle equally.
+    // Param 2: Any integer value.
+    list_default_arg_override (2, YT_ARG (char*){ LIST_DEFAULT_INTEGER_VALUE, "1" });
     help_argument_present();
     arg_value_length_clamping();
     list_type_argument_success();
