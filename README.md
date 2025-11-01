@@ -6,8 +6,8 @@
 
 ## cargs
 
-Cargs came about inspired by Tsoding's [flag.h](https://github.com/tsoding/flag.h). This however is
-not a fork, it takes only the idea as inspiration, the implementation, API is fully custom and
+Cargs came about inspired by Tsoding's [flag.h](https://github.com/tsoding/flag.h). This is however
+not a fork, it only took the idea as inspiration. The implementation, API is fully custom and
 written from scratch. 
 
 When you add an argument, you must also specify its type. This type determines what kind of input is
