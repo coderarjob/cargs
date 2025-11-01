@@ -696,11 +696,11 @@ Cargs_TypeInterface Integer = {
     .parse_string = cargs_int_parse_string,
 };
 
+// +1 for the NULL byte which the CARGS_MAX_INPUT_VALUE_LEN does not include
+typedef char Cargs_StringType[CARGS_MAX_INPUT_VALUE_LEN + 1];
 Cargs_TypeInterface String = {
     CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT,
-    .type_size = sizeof (char) * CARGS_MAX_INPUT_VALUE_LEN + 1, // +1 for the NULL byte which the
-                                                                // CARGS_MAX_INPUT_VALUE_LEN does
-                                                                // not include
+    .type_size    = sizeof (Cargs_StringType),
     .format_help  = "(text)",
     .parse_string = cargs_string_parse_string,
 };

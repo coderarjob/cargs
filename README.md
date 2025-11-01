@@ -44,7 +44,7 @@ bool number_columns_is_enabled (void)
 
 int main (int argc, char** argv)
 {
-    config.dir         = cargs_add_arg ("dir", "List this directory", CARGS_LISTOF (String), NULL);
+    config.dir         = cargs_add_arg ("dir", "List this directory", CARGS_LISTOF (String), ".");
     config.list        = cargs_add_arg ("l", "Show as list", Flag, "false");
     config.show_hidden = cargs_add_arg ("hidden", "Show hidden files", Flag, "false");
     config.help        = cargs_add_arg ("h", "Show help", Help, "false");
@@ -62,9 +62,8 @@ int main (int argc, char** argv)
 
     printf ("Dirs:\n  Count:%ld\n", config.dir->len);
 
-    typedef char Buffer[CARGS_MAX_INPUT_VALUE_LEN + 1];
     for (unsigned i = 0; i < config.dir->len; i++) {
-        printf ("  %d: %s\n", i, ((Buffer*)config.dir->buffer)[i]);
+        printf ("  %d: %s\n", i, ((Cargs_StringType*)config.dir->buffer)[i]);
     }
     printf ("show as list: %d\n", *config.list);
     printf ("show hidden files: %d\n", *config.show_hidden);
