@@ -17,8 +17,7 @@
  *  - [REQ: 6 ] Fail if value is provided for non-active args.
  *  - [REQ: 7 ] Fail if value is provided for unknown arg.
  *  - [REQ: 8 ] Help arg should stop further arg parsing and pass.
- *  - [REQ: 9 ] For non list args, provided value is parsed as per Interface type.
- *  - [REQ: 13] For list args, all provided values are parsed as per Interface type.
+ *  - [REQ: 9 ] Provided value is parsed as per Interface type.
  *  - [REQ: 17] Providing List arg values in one go or multiple should have same result.
  *  - [REQ: 18] Providing a value to optional args must override its default value.
  * cargs_add_arg
@@ -54,7 +53,7 @@
  * |                   | Help argument is provided when a required    |                           |
  * |                   | arg was not provided. Parsing should pass.   |                           |
  * |-------------------|----------------------------------------------|---------------------------|
- * | cargs_add_arg,    | * [REQ: 10], [REQ: 13], [REQ: 17]            |list_type_argument_success |
+ * | cargs_add_arg,    | * [REQ: 10], [REQ: 9], [REQ: 17]             |list_type_argument_success |
  * | CARGS_LISTOF      |                                              |                           |
  * | cargs_parse_input | Multiple values were passed for each argument|                           |
  * |                   | Parsing should pass.                         |                           |
