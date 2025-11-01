@@ -19,6 +19,7 @@
  *  - [REQ: 8 ] Help arg should stop further arg parsing and pass.
  *  - [REQ: 9 ] For non list args, provided value is parsed as per Interface type.
  *  - [REQ: 13] For list args, all provided values are parsed as per Interface type.
+ *  - [REQ: 17] Providing List arg values in one go or multiple should have same result.
  *  - [REQ: 18] Providing a value to optional args must override its default value.
  * cargs_add_arg
  *  - [REQ: 10] For list arg, multiple values of any number can be accessed by the pointer.
@@ -53,12 +54,15 @@
  * |                   | Help argument is provided when a required    |                           |
  * |                   | arg was not provided. Parsing should pass.   |                           |
  * |-------------------|----------------------------------------------|---------------------------|
- * | cargs_add_arg,    | * [REQ: 10], [REQ: 13]                       |list_type_argument_success |
+ * | cargs_add_arg,    | * [REQ: 10], [REQ: 13], [REQ: 17]            |list_type_argument_success |
  * | CARGS_LISTOF      |                                              |                           |
- * | cargs_parse_input |                                              |                           |
- * |                   |                                              |                           |
- * |                   | Multiple values were passed for each argument|                           |
+ * | cargs_parse_input | Multiple values were passed for each argument|                           |
  * |                   | Parsing should pass.                         |                           |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | List values given all at once                | Test# 1                   |
+ * |                   |----------------------------------------------|---------------------------|
+ * |                   | List values given individually by            | Test# 2                   |
+ * |                   | providing the list arg multiple times.       |                           |
  * |-------------------|----------------------------------------------|---------------------------|
  * | cargs_parse_input | * [REQ: 12]                                  |arg_value_length_clamping  |
  * |                   |                                              |                           |
@@ -196,15 +200,23 @@ YT_TESTP (cargs, required_arguments, bool)
     YT_END();
 }
 
-YT_TEST (cargs, list_type_argument_success)
+YT_TESTP (cargs, list_type_argument_success, bool)
 {
-    char* argv[] = { "dummy", "-A", "abc", "-B", "1", "2", "3", "-C", "true", NULL };
+    bool all_values_in_one_go = YT_ARG_0();
 
     char* a            = cargs_add_arg ("A", "1st arg", String, NULL);
     Cargs_ArrayList* b = cargs_add_arg ("B", "2nd arg", CARGS_LISTOF (Integer), NULL);
     char* c            = cargs_add_arg ("C", "3rd arg", Boolean, NULL);
 
-    YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
+    if (all_values_in_one_go) {
+        char* argv[] = { "dummy", "-A", "abc", "-B", "1", "2", "3", "-C", "true", NULL };
+        YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
+    } else {
+        char* argv[] = {
+            "dummy", "-A", "abc", "-B", "1", "-B", "2", "-B", "3", "-C", "true", NULL
+        };
+        YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
+    }
 
     YT_EQ_STRING (a, "abc");
     YT_EQ_SCALAR (*c, true);
@@ -356,12 +368,15 @@ int main (void)
     default_values();
     nonlist_default_arg_override();
     // list_default_arg_override:
-    // Param 1: Value same as default value was provided in command line. Should handle equally.
-    // Param 2: Any integer value.
+    // Case 1: Value same as default value was provided in command line. Should handle equally.
+    // Case 2: Any integer value.
     list_default_arg_override (2, YT_ARG (char*){ LIST_DEFAULT_INTEGER_VALUE, "1" });
     help_argument_present();
     arg_value_length_clamping();
-    list_type_argument_success();
+    // list_type_argument_success:
+    // Case 1: Values given to list arg all at once.
+    // Case 2: Values given to list arg individually by providing the argument multiple times.
+    list_type_argument_success (2, YT_ARG (bool){ true, false });
     unknown_argument_in_cl();
     arg_name_length_clamping();
     inactive_argument_in_cl (2, YT_ARG (bool){ true, false });
