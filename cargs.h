@@ -75,15 +75,20 @@ typedef struct {
 } Cargs_Slice;
 
 typedef struct Cargs_TypeInterface {
-    void* value; // When allow_multiple == true, value if of type Cargs_ArrayList. Rest of the
-                 // fields will remain same as the Type the ArrayList will hold.
-    char* name;
-    char* format_help;
+    /* -- Private fields -- */
+    char* CARGS__name;
+    void* CARGS__value;  // When allow_multiple == true, value if of type Cargs_ArrayList. Rest of
+                         // the fields will remain same as the Type the ArrayList will hold.
+    bool CARGS__is_flag; // set true for 'flag' arguments which don't need a value from command line
+    bool CARGS__allow_multiple;
+    /* -- Public fields -- */
     size_t type_size;
-    bool allow_multiple;
-    bool is_flag; // set true for 'flag' arguments which don't need a value from command line
+    char* format_help;
     bool (*parse_string) (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out);
 } Cargs_TypeInterface;
+
+#define CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT \
+    .CARGS__name = "", .CARGS__value = NULL, .CARGS__is_flag = false, .CARGS__allow_multiple = false
 
 typedef struct {
     void* buffer;
@@ -167,16 +172,17 @@ bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* in
 
 void* cargs_arl_pop (Cargs_ArrayList* arl);
 
-#define CARGS_LISTOF(ti)                                          \
-    (assert (!ti.is_flag), (Cargs_TypeInterface){                 \
-                               .name           = ti.name,         \
-                               .format_help    = ti.format_help,  \
-                               .type_size      = ti.type_size,    \
-                               .is_flag        = false,           \
-                               .allow_multiple = true,            \
-                               .parse_string   = ti.parse_string, \
-                           })
+#define CARGS_LISTOF(ti)                                                        \
+    (assert (!ti.CARGS__is_flag), (Cargs_TypeInterface){                        \
+                                      .CARGS__name           = ti.CARGS__name,  \
+                                      .CARGS__is_flag        = false,           \
+                                      .CARGS__allow_multiple = true,            \
+                                      .format_help           = ti.format_help,  \
+                                      .type_size             = ti.type_size,    \
+                                      .parse_string          = ti.parse_string, \
+                                  })
 
+#define CARGS_IMPLEMENTATION
 #ifdef CARGS_IMPLEMENTATION
 
 typedef struct CARGS__Argument {
@@ -291,14 +297,15 @@ bool CARGS__assign_value (Cargs_TypeInterface* interface, const char* input)
 {
     // Special case for flags. Flag arguments must always have a default value, which gets acted on
     // when the flag argument is found during argument parsing.
-    if (interface->is_flag) {
+    if (interface->CARGS__is_flag) {
         assert (input != NULL);
         return cargs_bool_parse_string (interface, input,
-                                        CARGS__SLICE_OF (interface->value, interface->type_size));
+                                        CARGS__SLICE_OF (interface->CARGS__value,
+                                                         interface->type_size));
     } else {
         if (input != NULL) {
             return interface->parse_string (interface, input,
-                                            CARGS__SLICE_OF (interface->value,
+                                            CARGS__SLICE_OF (interface->CARGS__value,
                                                              interface->type_size));
         }
     }
@@ -309,7 +316,7 @@ CARGS__Argument* CARGS__find_by_value_address (const void* needle)
 {
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* arg = CARGS__arg_list[i];
-        if (arg->interface.value == needle) {
+        if (arg->interface.CARGS__value == needle) {
             return arg;
         }
     }
@@ -348,10 +355,10 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
     new_arg->condition.is_enabled_fn = is_enabled_fn;
     new_arg->condition.description   = (char*)cond_desciption;
 
-    if (interface.allow_multiple) {
-        new_arg->interface.value = CARGS__arl_new_with_capacity (10, interface.type_size);
+    if (interface.CARGS__allow_multiple) {
+        new_arg->interface.CARGS__value = CARGS__arl_new_with_capacity (10, interface.type_size);
         if (default_value != NULL) {
-            void* dest = CARGS__arl_push ((Cargs_ArrayList*)new_arg->interface.value,
+            void* dest = CARGS__arl_push ((Cargs_ArrayList*)new_arg->interface.CARGS__value,
                                           NULL); // dummy insert
             assert (dest != NULL);               // push should ensure allocation/relocation worked!
 
@@ -359,7 +366,7 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
                                              CARGS__SLICE_OF (dest, new_arg->interface.type_size));
         }
     } else {
-        if (!(new_arg->interface.value = malloc (new_arg->interface.type_size))) {
+        if (!(new_arg->interface.CARGS__value = malloc (new_arg->interface.type_size))) {
             perror ("ERROR: Allocation failed");
             cargs_panic (NULL);
         }
@@ -372,18 +379,18 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
     CARGS__arg_list[CARGS__arg_list_count++] = new_arg;
 
     assert (new_arg != NULL); // Cannot be null since all previous errors must have been handled.
-    return new_arg->interface.value;
+    return new_arg->interface.CARGS__value;
 }
 
 void cargs_cleanup()
 {
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
         CARGS__Argument* arg = CARGS__arg_list[i];
-        if (arg->interface.value != NULL) {
-            if (arg->interface.allow_multiple) {
-                CARGS__arl_dealloc ((Cargs_ArrayList*)arg->interface.value);
+        if (arg->interface.CARGS__value != NULL) {
+            if (arg->interface.CARGS__allow_multiple) {
+                CARGS__arl_dealloc ((Cargs_ArrayList*)arg->interface.CARGS__value);
             } else {
-                free (arg->interface.value);
+                free (arg->interface.CARGS__value);
             }
         }
         free (arg);
@@ -418,20 +425,21 @@ bool cargs_parse_input (int argc, char** argv)
 
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
             // value to the flag argument) now when it is first detected.
-            if (the_arg->interface.is_flag) {
+            if (the_arg->interface.CARGS__is_flag) {
                 // Args updated during parsing are flaged dirty
                 the_arg->dirty = true;
 
                 the_arg->provided = the_arg->interface.parse_string (
                     &the_arg->interface, arg,
-                    CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size));
+                    CARGS__SLICE_OF (the_arg->interface.CARGS__value,
+                                     the_arg->interface.type_size));
 
                 assert (the_arg->provided); // Parsing of flags cannot fail, because it takes no
                                             // value.
 
                 // Special case for Help. If a help flag is found we skip the rest of the
                 // parsing and simply return.
-                if (strcmp ("help", the_arg->interface.name) == 0) {
+                if (strcmp ("help", the_arg->interface.CARGS__name) == 0) {
                     goto exit;
                 }
             }
@@ -441,8 +449,8 @@ bool cargs_parse_input (int argc, char** argv)
             Cargs_Slice output  = { 0 };
             void* new_list_item = NULL;
 
-            if (the_arg->interface.allow_multiple) {
-                Cargs_ArrayList* list = (Cargs_ArrayList*)the_arg->interface.value;
+            if (the_arg->interface.CARGS__allow_multiple) {
+                Cargs_ArrayList* list = (Cargs_ArrayList*)the_arg->interface.CARGS__value;
 
                 new_list_item = (list->len == 1 && !the_arg->dirty)
                                     ? list->buffer
@@ -454,7 +462,8 @@ bool cargs_parse_input (int argc, char** argv)
                 assert ((the_arg->default_value && the_arg->provided) ||
                         (!the_arg->default_value && !the_arg->provided));
 
-                output = CARGS__SLICE_OF (the_arg->interface.value, the_arg->interface.type_size);
+                output = CARGS__SLICE_OF (the_arg->interface.CARGS__value,
+                                          the_arg->interface.type_size);
             }
 
             if (!(the_arg->provided = the_arg->interface.parse_string (&the_arg->interface, arg,
@@ -495,8 +504,9 @@ static void CARGS__print_help_message (CARGS__Argument* arg, size_t max_arg_name
                                      ? CARGS__COL_DISABLED_ARG
                                      : CARGS__COL_ENABLED_ARG;
 
-    const char* list_indication_str = (arg->interface.allow_multiple) ? CARGS__LIST_MARKING_STRING
-                                                                      : "";
+    const char* list_indication_str = (arg->interface.CARGS__allow_multiple)
+                                          ? CARGS__LIST_MARKING_STRING
+                                          : "";
 
     assert (max_arg_format_help_len >= strlen (arg->interface.format_help));
     int arg_format_help_len = max_arg_format_help_len - strlen (arg->interface.format_help);
@@ -531,7 +541,7 @@ void cargs_print_help()
         max_arg_name_len         = CARGS__MAX (strlen (the_arg->name), max_arg_name_len);
         max_arg_format_help_len  = CARGS__MAX (max_arg_format_help_len,
                                                (strlen (the_arg->interface.format_help) +
-                                               (the_arg->interface.allow_multiple
+                                               (the_arg->interface.CARGS__allow_multiple
                                                      ? list_indication_string_len
                                                      : 0)));
     }
@@ -578,7 +588,7 @@ void cargs_print_help()
 bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out)
 {
     assert (self != NULL);
-    assert (self->value != NULL);
+    assert (self->CARGS__value != NULL);
     assert (out.len == sizeof (bool));
     CARGS_UNUSED (self);
 
@@ -596,7 +606,7 @@ bool cargs_bool_parse_string (struct Cargs_TypeInterface* self, const char* inpu
 bool cargs_int_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out)
 {
     assert (self != NULL);
-    assert (self->value != NULL);
+    assert (self->CARGS__value != NULL);
     assert (out.len == sizeof (int));
     CARGS_UNUSED (self);
 
@@ -611,7 +621,7 @@ bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* in
                                 Cargs_Slice out)
 {
     assert (self != NULL);
-    assert (self->value != NULL);
+    assert (self->CARGS__value != NULL);
     CARGS_UNUSED (self);
 
     assert (out.len - 1 <= CARGS_MAX_INPUT_VALUE_LEN);
@@ -633,7 +643,7 @@ bool cargs_string_parse_string (struct Cargs_TypeInterface* self, const char* in
 bool cargs_flag_parse_string (struct Cargs_TypeInterface* self, const char* input, Cargs_Slice out)
 {
     assert (self != NULL);
-    assert (self->value != NULL);
+    assert (self->CARGS__value != NULL);
     assert (out.len == sizeof (bool));
     CARGS_UNUSED (input);
 
@@ -655,7 +665,7 @@ bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* in
                                 Cargs_Slice out)
 {
     assert (self != NULL);
-    assert (self->value != NULL);
+    assert (self->CARGS__value != NULL);
     assert (out.len == sizeof (double));
     CARGS_UNUSED (self);
 
@@ -673,47 +683,47 @@ bool cargs_double_parse_string (struct Cargs_TypeInterface* self, const char* in
  *********************************************************************************************/
 
 Cargs_TypeInterface Boolean = {
-    .name         = "boolean",
-    .format_help  = "(false|true)",
+    CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT,
     .type_size    = sizeof (bool),
+    .format_help  = "(false|true)",
     .parse_string = cargs_bool_parse_string,
 };
 
 Cargs_TypeInterface Integer = {
-    .name         = "integer",
-    .format_help  = "(number)",
+    CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT,
     .type_size    = sizeof (int),
+    .format_help  = "(number)",
     .parse_string = cargs_int_parse_string,
 };
 
 Cargs_TypeInterface String = {
-    .name        = "string",
-    .format_help = "(text)",
-    .type_size   = sizeof (char) * CARGS_MAX_INPUT_VALUE_LEN + 1, // +1 for the NULL byte which the
-                                                                  // CARGS_MAX_INPUT_VALUE_LEN does
-                                                                  // not include
+    CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT,
+    .type_size = sizeof (char) * CARGS_MAX_INPUT_VALUE_LEN + 1, // +1 for the NULL byte which the
+                                                                // CARGS_MAX_INPUT_VALUE_LEN does
+                                                                // not include
+    .format_help  = "(text)",
     .parse_string = cargs_string_parse_string,
 };
 
 Cargs_TypeInterface Flag = {
-    .name         = "flag",
-    .format_help  = "",
-    .type_size    = sizeof (bool),
-    .is_flag      = true,
-    .parse_string = cargs_flag_parse_string,
+    .CARGS__name    = "",
+    .CARGS__is_flag = true,
+    .type_size      = sizeof (bool),
+    .format_help    = "",
+    .parse_string   = cargs_flag_parse_string,
 };
 
 Cargs_TypeInterface Double = {
-    .name         = "double",
-    .format_help  = "(decimal number)",
+    CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT,
     .type_size    = sizeof (double),
+    .format_help  = "(decimal number)",
     .parse_string = cargs_double_parse_string,
 };
 
 Cargs_TypeInterface Help = {
-    .name         = "help",
-    .format_help  = "",
-    .type_size    = sizeof (bool),
-    .is_flag      = true,
-    .parse_string = cargs_flag_parse_string,
+    .CARGS__name    = "help",
+    .CARGS__is_flag = true,
+    .type_size      = sizeof (bool),
+    .format_help    = "",
+    .parse_string   = cargs_flag_parse_string,
 };

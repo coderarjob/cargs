@@ -144,7 +144,7 @@ static bool test_enum_a_parse_string (struct Cargs_TypeInterface* self, const ch
 }
 
 Cargs_TypeInterface TestEnumAInterface = {
-    .name         = "TestEnumA",
+    CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT,
     .format_help  = "(item_1|item_2)",
     .type_size    = sizeof (TEST_ENUM_A),
     .parse_string = test_enum_a_parse_string,

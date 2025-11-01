@@ -36,7 +36,7 @@ bool modes_parse_string (struct Cargs_TypeInterface* self, const char* input, Ca
 }
 
 Cargs_TypeInterface ModesInterface = {
-    .name         = "Modes",
+    CARGS_TYPEINTERFACE_PRIVATE_FIELDS_INIT,
     .format_help  = "(sine|am|noise)",
     .type_size    = sizeof (Modes),
     .parse_string = modes_parse_string,
