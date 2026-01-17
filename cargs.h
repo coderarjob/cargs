@@ -547,8 +547,7 @@ void cargs_print_help()
     }
 
     assert (max_arg_name_len > 0 && max_arg_name_len <= CARGS_MAX_INPUT_VALUE_LEN);
-    assert (max_arg_format_help_len > 0 &&
-            max_arg_format_help_len <= CARGS_MAX_INPUT_VALUE_LEN + list_indication_string_len);
+    assert (max_arg_format_help_len <= CARGS_MAX_INPUT_VALUE_LEN + list_indication_string_len);
 
     size_t conditional_arg_count = 0;
 

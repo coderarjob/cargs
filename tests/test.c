@@ -353,6 +353,23 @@ YT_TESTP (cargs, inactive_argument_in_cl, bool)
 
     YT_END();
 }
+YT_TESTP (cargs, print_help, bool)
+{
+    bool add_non_flag_arg = YT_ARG_0();
+
+    cargs_add_arg ("h", "Shows usage", Help, "false");
+
+    if (add_non_flag_arg) {
+        cargs_add_arg ("A", "1st arg", Boolean, "false");
+    }
+
+    char* argv[] = { "dummy", "-h", NULL };
+    YT_EQ_SCALAR (true, cargs_parse_input (ARRAY_LEN (argv), argv));
+
+    cargs_print_help();
+
+    YT_END();
+}
 
 void yt_reset (void)
 {
@@ -379,5 +396,6 @@ int main (void)
     unknown_argument_in_cl();
     arg_name_length_clamping();
     inactive_argument_in_cl (2, YT_ARG (bool){ true, false });
+    print_help (2, YT_ARG (bool){ true, false });
     YT_RETURN_WITH_REPORT();
 }
