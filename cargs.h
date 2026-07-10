@@ -182,7 +182,6 @@ void* cargs_arl_pop (Cargs_ArrayList* arl);
                                       .parse_string          = ti.parse_string, \
                                   })
 
-#define CARGS_IMPLEMENTATION
 #ifdef CARGS_IMPLEMENTATION
 
 typedef struct CARGS__Argument {
