@@ -34,11 +34,11 @@
  * | FUT               | Requirement/Test case                        | Test function name        |
  * |-------------------|----------------------------------------------|---------------------------|
  * | cargs_add_arg,    | * [REQ: 11], [REQ: 9], [REQ: 4]              |non_list_arguments_parsing |
- * | cargs_parse_input |   [REQ: 16]                                  |                           |
+ * | cargs_parse_input |   [REQ: 16], [REQ: 20]                       |                           |
  * |                   |                                              |                           |
  * |                   | Argument values of were provided in cmd line |                           |
  * |                   | Parsing should pass and results match with   |                           |
- * |                   | input.                                       |                           |
+ * |                   | input. There are no duplicate arguments.     |                           |
  * |-------------------|----------------------------------------------|---------------------------|
  * | cargs_parse_input | * [REQ: 5]                                   |required_arguments         |
  * |                   |                                              |                           |
@@ -191,6 +191,8 @@ YT_TEST (cargs, non_list_arguments_parsing)
     YT_EQ_SCALAR (*c, true);
     YT_EQ_DOUBLE_REL (*d, 12.84, 0.001);
     YT_EQ_SCALAR (*e, (unsigned)TEST_ENUM_A_ITEM_1);
+
+    YT_MUST_NEVER_CALL (cargs_panic, _);
 
     YT_END();
 }
