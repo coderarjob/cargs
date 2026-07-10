@@ -201,6 +201,8 @@ typedef struct CARGS__Argument {
 unsigned int CARGS__arg_list_count = 0;
 CARGS__Argument* CARGS__arg_list[CARGS__MAX_ARG_COUNT];
 
+    #ifndef CARGS_UNITTEST
+// Will be mocked in the unittests
 void cargs_panic (const char* msg)
 {
     if (msg != NULL) {
@@ -208,6 +210,7 @@ void cargs_panic (const char* msg)
     }
     exit (1);
 }
+    #endif // CARGS_UNITTEST
 
     #define CARGS__MIN(a, b) ((a) > (b) ? (b) : (a))
     #define CARGS__MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -311,6 +314,17 @@ bool CARGS__assign_value (Cargs_TypeInterface* interface, const char* input)
     return true;
 }
 
+CARGS__Argument* CARGS__find_by_name (const char* needle)
+{
+    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
+        CARGS__Argument* arg = CARGS__arg_list[i];
+        if (strncmp (arg->name, needle, CARGS__MAX_NAME_LEN) == 0) {
+            return arg;
+        }
+    }
+    return NULL;
+}
+
 CARGS__Argument* CARGS__find_by_value_address (const void* needle)
 {
     for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
@@ -338,6 +352,10 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
 
     if (CARGS__arg_list_count >= CARGS__ARRAY_LEN (CARGS__arg_list)) {
         cargs_panic ("Too many arguments added");
+    }
+
+    if (CARGS__find_by_name (name) != NULL) {
+        cargs_panic ("Duplicate argument with same name exists");
     }
 
     if (!(new_arg = (CARGS__Argument*)malloc (sizeof (CARGS__Argument)))) {
@@ -395,17 +413,6 @@ void cargs_cleanup()
         free (arg);
     }
     CARGS__arg_list_count = 0;
-}
-
-CARGS__Argument* CARGS__find_by_name (const char* needle)
-{
-    for (unsigned i = 0; i < CARGS__arg_list_count; i++) {
-        CARGS__Argument* arg = CARGS__arg_list[i];
-        if (strncmp (arg->name, needle, CARGS__MAX_NAME_LEN) == 0) {
-            return arg;
-        }
-    }
-    return NULL;
 }
 
 bool cargs_parse_input (int argc, char** argv)

@@ -40,6 +40,7 @@ for cfile in ${TEST_SRC[@]}; do
     gcc -g                             \
         -Wall -Wextra                  \
         -fsanitize=$SAN_OPTS $cfile    \
+        -DCARGS_UNITTEST               \
         -o $OUTFILE || exit
 
     ./$OUTFILE || exit

@@ -7,6 +7,15 @@
 #define CARGS_IMPLEMENTATION
 #include "../cargs.h"
 
+// Mocked implementations -----------------------------------------------------------------
+#ifndef CARGS_UNITTEST
+    #error "CARGS_UNITTEST must be defined"
+#endif // CARGS_UNITTEST
+
+YT_DECLARE_FUNC_VOID (cargs_panic, const char*);
+YT_DEFINE_FUNC_VOID (cargs_panic, const char*);
+// -----------------------------------------------------------------
+
 TEST (arl, new_with_capacity)
 {
     Cargs_ArrayList* nl = CARGS__arl_new_with_capacity (10, sizeof (int));
