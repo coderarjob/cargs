@@ -26,7 +26,7 @@
  *  - [REQ: 14] Args provided with a default value are treated as optional.
  *  - [REQ: 15] For optional args, the default value is accessed by the pointer if no arg was given.
  *  - [REQ: 16] Ability to use custom argument interface type.
- *  - [REQ: 20] Duplicate arguments are not allowed
+ *  - [REQ: 20] Adding duplicate arguments are not allowed
  * General
  *  - [REQ: 12] All string inputs must have some cap on its length when accessing.
  *
@@ -114,7 +114,7 @@
  * |                   | Known argument provided for active arg       | Test# 2                   |
  * |                   | Parsing should pass.                         |                           |
  * |-------------------|----------------------------------------------|---------------------------|
- * | cargs_add_arg     | * [REQ: 20]                                  |duplicate_args_must_fail   |
+ * | cargs_add_arg     | * [REQ: 20]                                  |dup_args_add_must_fail     |
  * |                   |                                              |                           |
  * |                   | Duplicate arguments are checked              |                           |
  * |-------------------|----------------------------------------------|---------------------------|
@@ -386,7 +386,7 @@ YT_TESTP (cargs, print_help, bool)
     YT_END();
 }
 
-YT_TEST (cargs, duplicate_args_must_fail)
+YT_TEST (cargs, dup_args_add_must_fail)
 {
     cargs_add_arg ("in", "Arg 0", Integer, NULL);
     cargs_add_arg ("in", "Arg 1", Integer, NULL);
@@ -421,6 +421,6 @@ int main (void)
     arg_name_length_clamping();
     inactive_argument_in_cl (2, YT_ARG (bool){ true, false });
     print_help (2, YT_ARG (bool){ true, false });
-    duplicate_args_must_fail();
+    dup_args_add_must_fail();
     YT_RETURN_WITH_REPORT();
 }
