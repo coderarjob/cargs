@@ -206,7 +206,7 @@ CARGS__Argument* CARGS__arg_list[CARGS__MAX_ARG_COUNT];
 void cargs_panic (const char* msg)
 {
     if (msg != NULL) {
-        fprintf (stderr, "Panic! %s\n", msg);
+        fprintf (stderr, "[CARGS: Panic!] %s\n", msg);
     }
     exit (1);
 }
@@ -236,7 +236,7 @@ Cargs_ArrayList* CARGS__arl_new_with_capacity (size_t capacity, size_t item_size
 
     Cargs_ArrayList* newlist = (Cargs_ArrayList*)malloc (sizeof (Cargs_ArrayList));
     if (newlist == NULL) {
-        perror ("ERROR: Allocation failed");
+        perror ("[CARGS: ERROR] Allocation failed");
         cargs_panic (NULL);
     }
 
@@ -245,7 +245,7 @@ Cargs_ArrayList* CARGS__arl_new_with_capacity (size_t capacity, size_t item_size
     newlist->item_size = item_size;
     if (newlist->capacity > 0) {
         if (!(newlist->buffer = malloc (item_size * newlist->capacity))) {
-            perror ("ERROR: Allocation failed");
+            perror ("[CARGS: ERROR] Allocation failed");
             cargs_panic (NULL);
         }
     }
@@ -261,7 +261,7 @@ void* CARGS__arl_push (Cargs_ArrayList* arl, void* c)
         arl->capacity *= 2;
         arl->buffer = realloc (arl->buffer, arl->item_size * arl->capacity);
         if (arl->buffer == NULL) {
-            perror ("ERROR: Relocation failed");
+            perror ("[CARGS: ERROR] Relocation failed");
             cargs_panic (NULL);
         }
     }
@@ -359,7 +359,7 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
     }
 
     if (!(new_arg = (CARGS__Argument*)malloc (sizeof (CARGS__Argument)))) {
-        perror ("ERROR: Allocation failed");
+        perror ("[CARGS: ERROR] Allocation failed");
         cargs_panic (NULL);
     }
 
@@ -384,7 +384,7 @@ void* CARGS__cargs_add_arg (const char* name, const char* description,
         }
     } else {
         if (!(new_arg->interface.CARGS__value = malloc (new_arg->interface.type_size))) {
-            perror ("ERROR: Allocation failed");
+            perror ("[CARGS: ERROR] Allocation failed");
             cargs_panic (NULL);
         }
 
