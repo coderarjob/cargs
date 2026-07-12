@@ -20,6 +20,7 @@
  *  - [REQ: 9 ] Provided value is parsed as per Interface type.
  *  - [REQ: 17] Providing List arg values in one go or multiple should have same result.
  *  - [REQ: 18] Providing a value to optional args must override its default value.
+ *  - [REQ: 21] Providing duplicate single valued arguments are not allowed.
  * cargs_add_arg
  *  - [REQ: 10] For list arg, multiple values of any number can be accessed by the pointer.
  *  - [REQ: 11] For non-list arg, value can be accessed by the pointer.
@@ -117,6 +118,12 @@
  * | cargs_add_arg     | * [REQ: 20]                                  |dup_args_add_must_fail     |
  * |                   |                                              |                           |
  * |                   | Duplicate arguments are checked              |                           |
+ * |-------------------|----------------------------------------------|---------------------------|
+ * | cargs_parse_input | * [REQ: 21]                                  |dup_args_input_must_fail   |
+ * |                   |                                              |                           |
+ * |                   | Arugment was provided more than once for     |                           |
+ * |                   | non list arguments in the command line.      |                           |
+ * |                   | Parsing should fail.                         |                           |
  * |-------------------|----------------------------------------------|---------------------------|
  **************************************************************************************************/
 
@@ -386,6 +393,28 @@ YT_TESTP (cargs, print_help, bool)
     YT_END();
 }
 
+YT_TEST (cargs, dup_args_input_must_fail)
+{
+    // 1 Flags argument type
+    cargs_add_arg ("in", "Arg 0", Flag, "false");
+    char* argv1[] = { "dummy", "-in", "-in", NULL };
+    YT_EQ_SCALAR (false, cargs_parse_input (ARRAY_LEN (argv1), argv1));
+    cargs_cleanup();
+
+    // 2 Non Flags argument type without default value
+    cargs_add_arg ("in", "Arg 0", Boolean, NULL);
+    char* argv2[] = { "dummy", "-in", "false", "-in", "true", NULL };
+    YT_EQ_SCALAR (false, cargs_parse_input (ARRAY_LEN (argv2), argv2));
+    cargs_cleanup();
+
+    // 3 Non Flags argument type with default value
+    cargs_add_arg ("in", "Arg 0", Boolean, "true");
+    char* argv3[] = { "dummy", "-in", "false", "-in", "true", NULL };
+    YT_EQ_SCALAR (false, cargs_parse_input (ARRAY_LEN (argv3), argv3));
+
+    YT_END();
+}
+
 YT_TEST (cargs, dup_args_add_must_fail)
 {
     cargs_add_arg ("in", "Arg 0", Integer, NULL);
@@ -422,5 +451,6 @@ int main (void)
     inactive_argument_in_cl (2, YT_ARG (bool){ true, false });
     print_help (2, YT_ARG (bool){ true, false });
     dup_args_add_must_fail();
+    dup_args_input_must_fail();
     YT_RETURN_WITH_REPORT();
 }

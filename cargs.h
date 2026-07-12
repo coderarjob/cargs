@@ -429,6 +429,11 @@ bool cargs_parse_input (int argc, char** argv)
                 CARGS_ERROR (false, "Unknown argument '%s'", arg);
             }
 
+            // Non list arguments must be provided only once
+            if ((!the_arg->interface.CARGS__allow_multiple && the_arg->dirty)) {
+                CARGS_ERROR (false, "Argument '%s' provided more than once", the_arg->name);
+            }
+
             // Flags do not have a value, so we have to call parse_string (which sets a calculated
             // value to the flag argument) now when it is first detected.
             if (the_arg->interface.CARGS__is_flag) {
@@ -465,6 +470,7 @@ bool cargs_parse_input (int argc, char** argv)
                 assert (new_list_item != NULL);
                 output = CARGS__SLICE_OF (new_list_item, the_arg->interface.type_size);
             } else {
+                // Provided must only be set if default value is set, otherwise must be reset.
                 assert ((the_arg->default_value && the_arg->provided) ||
                         (!the_arg->default_value && !the_arg->provided));
 
